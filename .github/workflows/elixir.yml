@@ -1,0 +1,72 @@
+name: Elixir CI
+
+on:
+  push:
+    branches: ["**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - uses: erlef/setup-elixir@v1
+        id: beam
+        with:
+          otp-version: 25.1.1
+          elixir-version: 1.14.0
+      - name: Update apt-get database
+        run: sudo apt-get update
+      - name: Install libsodium
+        run: sudo apt-get install -y libsodium-dev
+      - name: Cache mix deps
+        uses: actions/cache@v3
+        id: mix-cache
+        env:
+          cache-name: cache-mix-deps
+        with:
+          # mix deps are stored in `./deps`
+          path: ./deps
+          key: ${{ runner.os }}-v1-deps-${{ env.cache-name }}-${{ hashFiles('./mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-v1-deps-${{ env.cache-name }}-
+            ${{ runner.os }}-v1-deps-
+            ${{ runner.os }}-v1-
+      - name: Cache build
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-build
+        with:
+          # build artifacts are stored in `./_build`
+          path: |
+            ./_build
+            !./_build/test/lib/objkt_repo
+          key: ${{ runner.os }}-v1-build-${{ env.cache-name }}-${{ hashFiles('./mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-v1-build-${{ env.cache-name }}-
+            ${{ runner.os }}-v1-build-
+            ${{ runner.os }}-v1-
+
+      - run: mix deps.get
+        if: steps.mix-cache.outputs.cache-hit != 'true'
+
+      - run: mix format --check-formatted
+
+      - run: mix test
+
+      - name: Restore PLT cache
+        uses: actions/cache@v3
+        id: dialyzer_cache
+        with:
+          key: |
+            ${{ runner.os }}-v1-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-${{ hashFiles('./mix.lock') }}-plt
+          path: |
+            priv/plts
+
+      - name: Create PLTs
+        if: steps.dialyzer_cache.outputs.cache-hit != 'true'
+        run: mix dialyzer --plt
+
+      - name: Run dialyzer
+        run: mix dialyzer
