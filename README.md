@@ -20,6 +20,10 @@ def deps do
 end
 ```
 
+## Requirements
+
+This lib depends on [enacl](https://github.com/jlouis/enacl#installrequirements) which requires `libsodium` (`brew install libsodium` / `apt-get install libsodium-dev`).
+
 ## Test
 
 ```sh
