@@ -36,6 +36,7 @@ defmodule Tezex.MixProject do
       {:base_58_check, "~> 1.0"},
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
       {:enacl, "~> 1.2.1"},
+      {:ex_doc, "~> 0.27", only: :dev, runtime: false},
       {:ex_unit_notifier, "~> 1.2", only: :test},
       {:excoveralls, "~> 0.15.1"},
       {:libsecp256k1, "~> 0.1.9"},

@@ -2,7 +2,7 @@ defmodule Tezex.Crypto do
   @moduledoc """
   A set of functions to check Tezos signed messages and verify a public key corresponds to a wallet address (public key hash).
   """
-  alias Tezex.Crypto.ECDSA
+  alias Tezex.Crypto.{Base58Check, ECDSA}
 
   @doc """
   Verify that `address` is the public key hash of `pubkey` and that `signature` is a valid signature for `message` signed with the private key corresponding to public key `pubkey`.
@@ -104,11 +104,11 @@ defmodule Tezex.Crypto do
   Verify that `address` is the public key hash of `pubkey`.
 
   ## Examples
-    iex> pubkey = "sppk7aBerAEA6tv4wzg6FnK7i5YrGtEGFVvNjWhc2QX8bhzpouBVFSW"
-    iex> Tezex.Crypto.check_address("tz2BC83pvEAag6r2ZV7kPghNAbjFoiqhCvZx", pubkey)
-    :ok
-    iex> Tezex.Crypto.check_address("tz1burnburnburnburnburnburnburjAYjjX", pubkey)
-    {:error, :mismatch}
+      iex> pubkey = "sppk7aBerAEA6tv4wzg6FnK7i5YrGtEGFVvNjWhc2QX8bhzpouBVFSW"
+      iex> Tezex.Crypto.check_address("tz2BC83pvEAag6r2ZV7kPghNAbjFoiqhCvZx", pubkey)
+      :ok
+      iex> Tezex.Crypto.check_address("tz1burnburnburnburnburnburnburjAYjjX", pubkey)
+      {:error, :mismatch}
   """
   @spec check_address(any, any) :: :ok | {:error, :mismatch | :unknown_pubkey_format}
   def check_address(address, pubkey) do
@@ -128,12 +128,12 @@ defmodule Tezex.Crypto do
   Derive public key hash (Tezos wallet address) from public key
 
   ## Examples
-    iex> Tezex.Crypto.derive_address("edpktsPhZ8weLEXqf4Fo5FS9Qx8ZuX4QpEBEwe63L747G8iDjTAF6w")
-    {:ok, "tz1LKpeN8ZSSFNyTWiBNaE4u4sjaq7J1Vz2z"}
-    iex> Tezex.Crypto.derive_address("sppk7aBerAEA6tv4wzg6FnK7i5YrGtEGFVvNjWhc2QX8bhzpouBVFSW")
-    {:ok, "tz2BC83pvEAag6r2ZV7kPghNAbjFoiqhCvZx"}
-    iex> Tezex.Crypto.derive_address("p2pk65yRxCX65k6qRPrbqGWvfW5JnLB1p3dn1oM5o9cyqLKPPhJaBMa")
-    {:ok, "tz3bPFa6mGv8m4Ppn7w5KSDyAbEPwbJNpC9p"}
+      iex> Tezex.Crypto.derive_address("edpktsPhZ8weLEXqf4Fo5FS9Qx8ZuX4QpEBEwe63L747G8iDjTAF6w")
+      {:ok, "tz1LKpeN8ZSSFNyTWiBNaE4u4sjaq7J1Vz2z"}
+      iex> Tezex.Crypto.derive_address("sppk7aBerAEA6tv4wzg6FnK7i5YrGtEGFVvNjWhc2QX8bhzpouBVFSW")
+      {:ok, "tz2BC83pvEAag6r2ZV7kPghNAbjFoiqhCvZx"}
+      iex> Tezex.Crypto.derive_address("p2pk65yRxCX65k6qRPrbqGWvfW5JnLB1p3dn1oM5o9cyqLKPPhJaBMa")
+      {:ok, "tz3bPFa6mGv8m4Ppn7w5KSDyAbEPwbJNpC9p"}
   """
   @spec derive_address(binary) :: {:error, :unknown_pubkey_format} | {:ok, binary}
   def derive_address("edpk" <> _ = pubkey) do

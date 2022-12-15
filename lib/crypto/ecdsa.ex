@@ -29,11 +29,11 @@ defmodule Tezex.Crypto.ECDSA do
   ```
 
   Parameters:
-  - `compressed_pubkey` [string]: the public key to decode
-  - `curve` [%EllipticCurve.Curve]: the curve to use (or one of `:prime256v1`, `:secp256k1` for the two known curves supported by default)
+  - `compressed_pubkey` [`binary`]: the public key to decode
+  - `curve` [`%EllipticCurve.Curve{}`]: the curve to use (or one of `:prime256v1`, `:secp256k1` for the two known curves supported by default)
 
   Returns:
-  - public_key [EllipticCurve.PublicKey]: a struct containing the public point and the curve;
+  - public_key [`%EllipticCurve.PublicKey{}`]: a struct containing the public point and the curve;
   """
   def decode_public_key(compressed_pubkey, curve_name) when is_atom(curve_name) do
     curve = KnownCurves.getCurveByName(curve_name)
@@ -73,14 +73,14 @@ defmodule Tezex.Crypto.ECDSA do
   Verifies a message signature based on a public key
 
   Parameters:
-  - `message` [string]: message that was signed
-  - `signature` [%EllipticCurve.Signature]: signature associated with the message
-  - `public_key` [%EllipticCurve.PublicKey]: public key associated with the message signer
-  - `options` [keyword list]: refines request
-    - `:hashfunc` [:method]: hash function applied to the message. Default: `fn msg -> :crypto.hash(:sha256, msg) end`
+  - `message` [`binary`]: message that was signed
+  - `signature` [`%EllipticCurve.Signature{}`]: signature associated with the message
+  - `public_key` [`%EllipticCurve.PublicKey{}`]: public key associated with the message signer
+  - `options` [`kw list`]: refines request
+    - `:hashfunc` [`fun/1`]: hash function applied to the message. Default: `fn msg -> :crypto.hash(:sha256, msg) end`
 
   Returns:
-  - verified [bool]: true if message, public key and signature are compatible, false otherwise;
+  - verified [`bool`]: true if message, public key and signature are compatible, false otherwise
   """
   def verify?(message, signature, public_key, options \\ []) do
     # basically https://github.com/starkbank/ecdsa-elixir/blob/ab5b3914ae2ee47cb87bdfe471871943c4761523/lib/ecdsa.ex#L77

@@ -30,8 +30,14 @@ defmodule Tezex.Micheline.Zarith do
   Encodes an integer to a zarith-encoded binary.
   Takes an integer in base 10 and returns the encoded binary.
 
-  Implementation based on https://github.com/anchorageoss/tezosprotocol/blob/23a051d34fcfda8393940141f8151113a1aca10b/zarith/zarith.go#L153
-  MIT License - Copyright (c) 2019 Anchor Labs, Inc.
+  Implementation based on [anchorageoss/tezosprotocol (MIT License - Copyright (c) 2019 Anchor Labs, Inc.)](https://github.com/anchorageoss/tezosprotocol/blob/23a051d34fcfda8393940141f8151113a1aca10b/zarith/zarith.go#L153)
+
+  ## Examples
+      iex> Tezex.Micheline.Zarith.encode(365_729)
+      "a1d22c"
+
+      iex> Tezex.Micheline.Zarith.encode(-365_729)
+      "e1d22c"
   """
   @spec encode(integer) :: nonempty_binary
   def encode(integer) when is_integer(integer) do

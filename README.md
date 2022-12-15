@@ -5,7 +5,7 @@ A collection of utils to work with the Tezos blockchain using Elixir: parsing Mi
 
 Read the documentation on [hexdocs](https://hexdocs.pm/tezex/).
 
-Since so far what this lib provides is limited to what we need at [objkt.com](https://objkt.com), external contributions are most welcome.
+Since what this lib provides is so far limited to what we need at [objkt.com](https://objkt.com), external contributions are most welcome.
 For instance if you need to sign messages or transactions, or translating Micheline to hex, we'd love to collaborate on a PR.
 
 ## Installation
@@ -20,3 +20,16 @@ def deps do
 end
 ```
 
+## Test
+
+```sh
+$ mix test
+$ mix test.watch
+$ mix coveralls.html
+```
+
+## Generate Documentation
+
+```sh
+$ mix docs
+```
