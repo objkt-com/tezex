@@ -25,4 +25,7 @@ tezex-*.tar
 # Temporary files, for example, from tests.
 /tmp/
 
+# Ignore PLTs
+/priv/plts/
+
 /.elixir_ls/

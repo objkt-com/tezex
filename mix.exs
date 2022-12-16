@@ -6,6 +6,8 @@ defmodule Tezex.MixProject do
       app: :tezex,
       version: "0.1.0",
       elixir: "~> 1.13",
+      description: description(),
+      package: package(),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       test_coverage: [tool: ExCoveralls],
@@ -20,6 +22,20 @@ defmodule Tezex.MixProject do
       dialyzer: [
         plt_file: {:no_warn, "priv/plts/dialyzer.plt"}
       ]
+    ]
+  end
+
+  defp description() do
+    "A collection of utils to work with the Tezos blockchain using Elixir: parsing Micheline, verifying Tezos signed messages, deriving Tezos wallet addresses from public key, etc."
+  end
+
+  defp package() do
+    [
+      name: "tezex",
+      source_url: "https://github.com/objkt-com/tezex",
+      links: %{"GitHub" => "https://github.com/objkt-com/tezex"},
+      licenses: ["MIT"],
+      files: ~w(lib .formatter.exs mix.exs README* LICENSE*)
     ]
   end
 
