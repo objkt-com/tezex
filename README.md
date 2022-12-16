@@ -1,5 +1,5 @@
 # Tezex
-[![Build Status](https://img.shields.io/github/workflow/status/objkt-com/tezex/CI)](https://github.com/objkt-com/tezex/actions) [![Coverage Status](https://img.shields.io/coveralls/objkt-com/tezex.svg)](https://coveralls.io/github/objkt-com/tezex) [![Hex.pm Version](https://img.shields.io/hexpm/v/tezex.svg)](https://hex.pm/packages/tezex) [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://hexdocs.pm/tezex/)
+[![Build Status](https://img.shields.io/github/workflow/status/objkt-com/tezex/elixir)](https://github.com/objkt-com/tezex/actions) [![Hex.pm Version](https://img.shields.io/hexpm/v/tezex.svg)](https://hex.pm/packages/tezex) [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://hexdocs.pm/tezex/)
 
 A collection of utils to work with the Tezos blockchain using Elixir: parsing Micheline, verifying Tezos signed messages, deriving Tezos wallet addresses from public key, etc.
 
