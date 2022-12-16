@@ -1,10 +1,14 @@
 defmodule Tezex.MixProject do
   use Mix.Project
 
+  @version "0.1.0"
+  @url_docs "http://hexdocs.pm/tezex"
+  @url_github "https://github.com/objkt-com/tezex"
+
   def project do
     [
       app: :tezex,
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.13",
       description: description(),
       package: package(),
@@ -18,7 +22,12 @@ defmodule Tezex.MixProject do
         "coveralls.html": :test,
         "test.watch": :test
       ],
-      docs: [main: "readme", extras: ["README.md"]],
+      docs: [
+        source_ref: "v#{@version}",
+        source_url: @url_github,
+        main: "readme",
+        extras: ["README.md"]
+      ],
       dialyzer: [
         plt_file: {:no_warn, "priv/plts/dialyzer.plt"}
       ]
@@ -32,8 +41,10 @@ defmodule Tezex.MixProject do
   defp package() do
     [
       name: "tezex",
-      source_url: "https://github.com/objkt-com/tezex",
-      links: %{"GitHub" => "https://github.com/objkt-com/tezex"},
+      links: %{
+        "Docs" => @url_docs,
+        "GitHub" => @url_github
+      },
       licenses: ["MIT"],
       files: ~w(lib .formatter.exs mix.exs README* LICENSE*)
     ]
