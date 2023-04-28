@@ -6,10 +6,7 @@ defmodule Tezex.Crypto.KnownCurves do
 
   alias Tezex.Crypto.{Curve, Point}
 
-  @secp256k1Oid [1, 3, 132, 0, 10]
   @secp256k1name :secp256k1
-
-  @prime256v1 [1, 2, 840, 10045, 3, 1, 7]
   @prime256v1name :prime256v1
 
   @spec get_curve_by_name(:prime256v1 | :secp256k1) :: Curve.t()
@@ -30,8 +27,7 @@ defmodule Tezex.Crypto.KnownCurves do
       G: %Point{
         x: 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798,
         y: 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8
-      },
-      oid: @secp256k1Oid
+      }
     }
   end
 
@@ -45,8 +41,7 @@ defmodule Tezex.Crypto.KnownCurves do
       G: %Point{
         x: 0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296,
         y: 0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5
-      },
-      oid: @prime256v1
+      }
     }
   end
 end
