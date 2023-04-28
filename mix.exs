@@ -66,7 +66,6 @@ defmodule Tezex.MixProject do
       {:ex_doc, "~> 0.27", only: :dev, runtime: false},
       {:ex_unit_notifier, "~> 1.2", only: :test},
       {:excoveralls, "~> 0.15.1"},
-      {:libsecp256k1, "~> 0.1.9"},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:starkbank_ecdsa, "~> 1.1.0"}
     ]

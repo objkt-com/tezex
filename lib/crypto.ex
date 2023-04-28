@@ -70,28 +70,36 @@ defmodule Tezex.Crypto do
     end
   end
 
-  def verify_signature("sp" <> _sig = signature, message, pubkey) do
+  def verify_signature("sp" <> _sig = signature, msg, pubkey) do
     # tz2…
-    message_hash = hash_message(message)
-    signature = decode_signature(signature)
+    sig = decode_signature(signature)
 
-    pubkey =
-      pubkey
-      |> decode_base58()
-      |> binary_part(4, 33)
-
-    :ok == :libsecp256k1.ecdsa_verify_compact(message_hash, signature, pubkey)
-  end
-
-  def verify_signature("p2" <> _sig = signature, msg, pubkey) do
-    # tz3…
-    <<54, 240, 44, 52>> <> <<sig::binary-size(64)>> <> _ = decode_base58(signature)
     <<r::unsigned-integer-size(256), s::unsigned-integer-size(256)>> = sig
     signature = %EllipticCurve.Signature{r: r, s: s}
 
     message = :binary.decode_hex(msg)
 
-    <<0x03, 0xB2, 0x8B, 0x7F>> <> <<public_key::binary-size(33)>> <> _ = decode_base58(pubkey)
+    # <<0x03, 0xFE, 0xE2, 0x56>>
+    <<3, 254, 226, 86>> <> <<public_key::binary-size(33)>> <> _ = decode_base58(pubkey)
+
+    public_key = ECDSA.decode_public_key(public_key, :secp256k1)
+
+    ECDSA.verify?(message, signature, public_key,
+      hashfunc: fn msg -> :enacl.generichash(32, msg) end
+    )
+  end
+
+  def verify_signature("p2" <> _sig = signature, msg, pubkey) do
+    # tz3…
+    <<54, 240, 44, 52>> <> <<sig::binary-size(64)>> <> _ = decode_base58(signature)
+
+    <<r::unsigned-integer-size(256), s::unsigned-integer-size(256)>> = sig
+    signature = %EllipticCurve.Signature{r: r, s: s}
+
+    message = :binary.decode_hex(msg)
+
+    # <<0x03, 0xB2, 0x8B, 0x7F>>
+    <<3, 178, 139, 127>> <> <<public_key::binary-size(33)>> <> _ = decode_base58(pubkey)
 
     public_key = ECDSA.decode_public_key(public_key, :prime256v1)
 

@@ -41,8 +41,6 @@ This lib depends on [enacl](https://github.com/jlouis/enacl#installrequirements)
 For macOS: `brew install libsodium gmp automake libtool gcc`.
 If you have an Apple Silicon processor take a look here: https://github.com/jlouis/enacl/issues/53 .
 
-`libsecp256k1` sometimes fails to compile on the first attempt, it should work after `mix deps.compile --force libsecp256k1`
-
 ## Test
 
 ```sh
