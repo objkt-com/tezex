@@ -30,7 +30,7 @@ defmodule Tezex.Micheline do
       iex> Tezex.Micheline.read_packed("0200e1d22c")
       %{int: -365_729}
   """
-  @spec read_packed(binary) :: any
+  @spec read_packed(binary) :: map
   def read_packed(<<_::binary-size(2), rest::binary>>) do
     {val, _consumed} = hex_to_micheline(rest)
     val
@@ -47,7 +47,7 @@ defmodule Tezex.Micheline do
       iex> Tezex.Micheline.hex_to_micheline("00e1d22c")
       {%{int: -365729}, 8}
   """
-  @spec hex_to_micheline(binary) :: {any, pos_integer}
+  @spec hex_to_micheline(binary) :: {map, pos_integer}
   # literal int or nat
   def hex_to_micheline("00" <> rest) do
     {result, consumed} = Zarith.consume(rest)

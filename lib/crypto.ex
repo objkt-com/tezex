@@ -118,7 +118,8 @@ defmodule Tezex.Crypto do
       iex> Tezex.Crypto.check_address("tz1burnburnburnburnburnburnburjAYjjX", pubkey)
       {:error, :mismatch}
   """
-  @spec check_address(any, any) :: :ok | {:error, :mismatch | :unknown_pubkey_format}
+  @spec check_address(nonempty_binary, nonempty_binary) ::
+          :ok | {:error, :mismatch | :unknown_pubkey_format}
   def check_address(address, pubkey) do
     case derive_address(pubkey) do
       {:ok, ^address} ->
@@ -143,7 +144,8 @@ defmodule Tezex.Crypto do
       iex> Tezex.Crypto.derive_address("p2pk65yRxCX65k6qRPrbqGWvfW5JnLB1p3dn1oM5o9cyqLKPPhJaBMa")
       {:ok, "tz3bPFa6mGv8m4Ppn7w5KSDyAbEPwbJNpC9p"}
   """
-  @spec derive_address(binary) :: {:error, :unknown_pubkey_format} | {:ok, binary}
+  @spec derive_address(nonempty_binary) ::
+          {:error, :unknown_pubkey_format} | {:ok, nonempty_binary}
   def derive_address("edpk" <> _ = pubkey) do
     # tz1…
     pkh = <<6, 161, 159>>

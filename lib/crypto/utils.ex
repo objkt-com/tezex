@@ -1,6 +1,7 @@
 defmodule Tezex.Crypto.Utils do
   @moduledoc false
 
+  @spec mod(integer, integer) :: non_neg_integer
   def mod(x, n) do
     case rem(x, n) do
       r when r < 0 -> r + n
@@ -8,10 +9,12 @@ defmodule Tezex.Crypto.Utils do
     end
   end
 
+  @spec mod_add(integer, integer, integer) :: non_neg_integer
   def mod_add(left, right, modulus) do
     mod(left + right, modulus)
   end
 
+  @spec mod_sub(integer, integer, integer) :: non_neg_integer
   def mod_sub(left, right, modulus) do
     mod(left - right, modulus)
   end
@@ -26,6 +29,7 @@ defmodule Tezex.Crypto.Utils do
     acc
   end
 
+  @spec number_from_string(binary) :: integer
   def number_from_string(string) do
     {parsed_int, ""} =
       string

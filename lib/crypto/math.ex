@@ -2,12 +2,12 @@
 defmodule Tezex.Crypto.Math do
   @moduledoc false
 
-  alias Tezex.Crypto.{Utils, Point}
+  alias Tezex.Crypto.{Point, Utils}
 
   @doc """
-  Fast way to multily point and scalar in elliptic curves
+  Fast way to multiply point and scalar in elliptic curves
 
-  - `p` [integer]: First Point to mutiply
+  - `p` [%Point]: First Point to mutiply
   - `n` [integer]: Scalar to mutiply
   - `c_n` [integer]: Order of the elliptic curve
   - `c_p` [integer]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
@@ -16,6 +16,7 @@ defmodule Tezex.Crypto.Math do
   Returns:
   - `point` [%Point]: point that represents the sum of First and Second Point
   """
+  @spec multiply(Point.t(), integer, integer, integer, integer) :: Point.t()
   def multiply(p, n, c_n, c_a, c_p) do
     p
     |> to_jacobian()
@@ -26,14 +27,15 @@ defmodule Tezex.Crypto.Math do
   @doc """
   Fast way to add two points in elliptic curves
 
-  - `p` [integer]: First Point you want to add
-  - `q` [integer]: Second Point you want to add
+  - `p` [%Point]: First Point you want to add
+  - `q` [%Point]: Second Point you want to add
   - `c_p` [integer]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
   - `c_a` [integer]: Coefficient of the first-order term of the equation Y^2 = X^3 + c_a*X + B (mod p)
 
   Returns:
   - `point` [%Point]: point that represents the sum of First and Second Point
   """
+  @spec add(Point.t(), Point.t(), integer, integer) :: Point.t()
   def add(p, q, c_a, c_p) do
     jacobian_add(to_jacobian(p), to_jacobian(q), c_a, c_p)
     |> from_jacobian(c_p)

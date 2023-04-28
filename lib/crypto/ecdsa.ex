@@ -3,7 +3,15 @@ defmodule Tezex.Crypto.ECDSA do
   Decode compressed public key and verify signatures using the Elliptic Curve Digital Signature Algorithm (ECDSA).
   """
 
-  alias Tezex.Crypto.{Utils, Math, Point, PublicKey, KnownCurves, Curve}
+  alias Tezex.Crypto.{
+    Curve,
+    KnownCurves,
+    Math,
+    Point,
+    PublicKey,
+    Signature,
+    Utils
+  }
 
   @doc """
   Decodes a compressed public key to the EC public key it is representing on EC `curve`.
@@ -32,6 +40,7 @@ defmodule Tezex.Crypto.ECDSA do
   Returns:
   - public_key [`%PublicKey{}`]: a struct containing the public point and the curve;
   """
+  @spec decode_public_key(nonempty_binary, :prime256v1 | :secp256k1 | Curve.t()) :: PublicKey.t()
   def decode_public_key(compressed_pubkey, curve_name) when is_atom(curve_name) do
     curve = KnownCurves.get_curve_by_name(curve_name)
     decode_public_key(compressed_pubkey, curve)
@@ -41,6 +50,7 @@ defmodule Tezex.Crypto.ECDSA do
     %PublicKey{point: decode_point(compressed_pubkey, curve), curve: curve}
   end
 
+  @spec decode_point(nonempty_binary, Tezex.Crypto.Curve.t()) :: Tezex.Crypto.Point.t()
   def decode_point(compressed_pubkey, %Curve{name: :prime256v1} = curve) do
     prime = curve."P"
 
@@ -115,6 +125,7 @@ defmodule Tezex.Crypto.ECDSA do
   Returns:
   - verified [`bool`]: true if message, public key and signature are compatible, false otherwise
   """
+  @spec verify?(nonempty_binary, Signature.t(), PublicKey.t(), list) :: boolean
   def verify?(message, signature, public_key, options \\ []) do
     %{hashfunc: hashfunc} =
       Enum.into(options, %{hashfunc: fn msg -> :crypto.hash(:sha256, msg) end})
