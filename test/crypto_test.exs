@@ -50,6 +50,60 @@ defmodule Tezex.Crypto.Test do
     end
   end
 
+  test "does not verify invalid signatures" do
+    # modify one character in the valid signed message to make it invalid
+    for {{address, msg, sig, pubkey}, idx} <- Enum.with_index(@msg_sig_pubkey, 1) do
+      try do
+        # replace the 21st character with '9'
+        msg = String.replace(msg, ~r/^(.{0,20})(.{1})(.*)/, "\\g{1}9\\g{3}")
+        refute Crypto.check_signature(address, sig, msg, pubkey)
+      rescue
+        err ->
+          IO.inspect("sig check should have failed", label: idx)
+          raise err
+      end
+    end
+
+    # modify one character in the valid signature to make it invalid
+    for {{address, msg, sig, pubkey}, idx} <- Enum.with_index(@msg_sig_pubkey, 1) do
+      try do
+        # replace the 21st character with '9'
+        sig = String.replace(sig, ~r/^(.{0,20})(.{1})(.*)/, "\\g{1}9\\g{3}")
+        refute Crypto.check_signature(address, sig, msg, pubkey)
+      rescue
+        err ->
+          IO.inspect("sig check should have failed", label: idx)
+          raise err
+      end
+    end
+
+    # modify one character in the valid pubkey to make it invalid
+    for {{address, msg, sig, pubkey}, idx} <- Enum.with_index(@msg_sig_pubkey, 1) do
+      try do
+        # replace the 21st character with '9'
+        pubkey = String.replace(pubkey, ~r/^(.{0,20})(.{1})(.*)/, "\\g{1}9\\g{3}")
+        refute Crypto.check_signature(address, sig, msg, pubkey)
+      rescue
+        err ->
+          IO.inspect("sig check should have failed", label: idx)
+          raise err
+      end
+    end
+
+    # modify one character in the address to make it invalid
+    for {{address, msg, sig, pubkey}, idx} <- Enum.with_index(@msg_sig_pubkey, 1) do
+      try do
+        # replace the 21st character with '9'
+        address = String.replace(address, ~r/^(.{0,20})(.{1})(.*)/, "\\g{1}9\\g{3}")
+        refute Crypto.check_signature(address, sig, msg, pubkey)
+      rescue
+        err ->
+          IO.inspect("sig check should have failed", label: idx)
+          raise err
+      end
+    end
+  end
+
   describe "address check" do
     test "key derivation" do
       hashes = [
