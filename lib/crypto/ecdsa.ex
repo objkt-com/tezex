@@ -44,13 +44,14 @@ defmodule Tezex.Crypto.ECDSA do
     %PublicKey{point: decode_point(compressed_pubkey, curve), curve: curve}
   end
 
-  def decode_point(compressed_pubkey, curve) do
+  def decode_point(compressed_pubkey, %EllipticCurve.Curve{name: :prime256v1} = curve) do
     prime = curve."P"
 
     b = curve."B"
 
     p_ident = div(prime + 1, 4)
     <<sign_y::unsigned-integer-8>> <> x = compressed_pubkey
+    sign_y = rem(sign_y, 2)
 
     x = :binary.decode_unsigned(x)
     a = x ** 3 - x * 3 + b
@@ -59,12 +60,47 @@ defmodule Tezex.Crypto.ECDSA do
       :crypto.mod_pow(a, p_ident, prime)
       |> :binary.decode_unsigned()
       |> then(fn y ->
-        if rem(y, 2) != sign_y do
-          prime - y
-        else
+        if rem(y, 2) == sign_y do
           y
+        else
+          prime - y
         end
       end)
+
+    %Point{x: x, y: y}
+  end
+
+  def decode_point(compressed_pubkey, %EllipticCurve.Curve{name: :secp256k1} = curve) do
+    # Determine the prefix of the compressed public key and parse the x-coordinate from the compressed public key
+    <<prefix::unsigned-integer-8>> <> x = compressed_pubkey
+    x = :binary.decode_unsigned(x)
+
+    p = curve."P"
+
+    # Compute the square of the x-coordinate
+    x_squared =
+      :crypto.mod_pow(x, 3, p)
+      |> :binary.decode_unsigned()
+
+    # Compute the right-hand side of the secp256k1 equation
+    y_squared = mod_add(x_squared, 7, p)
+
+    # Compute the square root of y_squared modulo p
+    y = :crypto.mod_pow(y_squared, div(p + 1, 4), p) |> :binary.decode_unsigned()
+
+    # Choose the correct y-coordinate based on the prefix
+    y =
+      if rem(prefix, 2) == 0 do
+        # If the prefix is even, choose the even value of y
+        y_even = y
+        y_odd = mod_sub(p, y_even, p)
+        if rem(y_odd, 2) == 0, do: y_odd, else: y_even
+      else
+        # If the prefix is odd, choose the odd value of y
+        y_odd = y
+        y_even = mod_sub(p, y_odd, p)
+        if rem(y_even, 2) == 0, do: y_even, else: y_odd
+      end
 
     %Point{x: x, y: y}
   end
@@ -117,11 +153,19 @@ defmodule Tezex.Crypto.ECDSA do
       )
 
     cond do
-      signature.r < 1 || signature.r >= curve_data."N" -> false
-      signature.s < 1 || signature.s >= curve_data."N" -> false
+      signature.r < 1 or signature.r >= curve_data."N" -> false
+      signature.s < 1 or signature.s >= curve_data."N" -> false
       Point.isAtInfinity?(v) -> false
       IntegerUtils.modulo(v.x, curve_data."N") != signature.r -> false
       true -> true
     end
+  end
+
+  defp mod_add(left, right, modulus) do
+    rem(left + right, modulus)
+  end
+
+  defp mod_sub(left, right, modulus) do
+    rem(left - right, modulus)
   end
 end
