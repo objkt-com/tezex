@@ -2,7 +2,7 @@ defmodule Tezex.Crypto do
   @moduledoc """
   A set of functions to check Tezos signed messages and verify a public key corresponds to a wallet address (public key hash).
   """
-  alias Tezex.Crypto.{Base58Check, ECDSA}
+  alias Tezex.Crypto.{Base58Check, ECDSA, Signature}
 
   @doc """
   Verify that `address` is the public key hash of `pubkey` and that `signature` is a valid signature for `message` signed with the private key corresponding to public key `pubkey`.
@@ -75,7 +75,7 @@ defmodule Tezex.Crypto do
     sig = decode_signature(signature)
 
     <<r::unsigned-integer-size(256), s::unsigned-integer-size(256)>> = sig
-    signature = %EllipticCurve.Signature{r: r, s: s}
+    signature = %Signature{r: r, s: s}
 
     message = :binary.decode_hex(msg)
 
@@ -94,7 +94,7 @@ defmodule Tezex.Crypto do
     <<54, 240, 44, 52>> <> <<sig::binary-size(64)>> <> _ = decode_base58(signature)
 
     <<r::unsigned-integer-size(256), s::unsigned-integer-size(256)>> = sig
-    signature = %EllipticCurve.Signature{r: r, s: s}
+    signature = %Signature{r: r, s: s}
 
     message = :binary.decode_hex(msg)
 

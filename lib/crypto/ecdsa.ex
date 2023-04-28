@@ -3,10 +3,7 @@ defmodule Tezex.Crypto.ECDSA do
   Decode compressed public key and verify signatures using the Elliptic Curve Digital Signature Algorithm (ECDSA).
   """
 
-  alias EllipticCurve.Utils.Integer, as: IntegerUtils
-  alias EllipticCurve.Utils.BinaryAscii
-  alias EllipticCurve.{Point, PublicKey, Math}
-  alias EllipticCurve.Curve.KnownCurves
+  alias Tezex.Crypto.{Utils, Math, Point, PublicKey, KnownCurves, Curve}
 
   @doc """
   Decodes a compressed public key to the EC public key it is representing on EC `curve`.
@@ -14,7 +11,7 @@ defmodule Tezex.Crypto.ECDSA do
   Here is a sample `curve`, P-256 with curve parameters from <https://neuromancer.sk/std/nist/>:
 
   ```elixir
-  %EllipticCurve.Curve{
+  %Curve{
       name: :prime256v1,
       A: 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC,
       B: 0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B,
@@ -30,13 +27,13 @@ defmodule Tezex.Crypto.ECDSA do
 
   Parameters:
   - `compressed_pubkey` [`binary`]: the public key to decode
-  - `curve` [`%EllipticCurve.Curve{}`]: the curve to use (or one of `:prime256v1`, `:secp256k1` for the two known curves supported by default)
+  - `curve` [`%Curve{}`]: the curve to use (or one of `:prime256v1`, `:secp256k1` for the two known curves supported by default)
 
   Returns:
-  - public_key [`%EllipticCurve.PublicKey{}`]: a struct containing the public point and the curve;
+  - public_key [`%PublicKey{}`]: a struct containing the public point and the curve;
   """
   def decode_public_key(compressed_pubkey, curve_name) when is_atom(curve_name) do
-    curve = KnownCurves.getCurveByName(curve_name)
+    curve = KnownCurves.get_curve_by_name(curve_name)
     decode_public_key(compressed_pubkey, curve)
   end
 
@@ -44,7 +41,7 @@ defmodule Tezex.Crypto.ECDSA do
     %PublicKey{point: decode_point(compressed_pubkey, curve), curve: curve}
   end
 
-  def decode_point(compressed_pubkey, %EllipticCurve.Curve{name: :prime256v1} = curve) do
+  def decode_point(compressed_pubkey, %Curve{name: :prime256v1} = curve) do
     prime = curve."P"
 
     b = curve."B"
@@ -70,7 +67,7 @@ defmodule Tezex.Crypto.ECDSA do
     %Point{x: x, y: y}
   end
 
-  def decode_point(compressed_pubkey, %EllipticCurve.Curve{name: :secp256k1} = curve) do
+  def decode_point(compressed_pubkey, %Curve{name: :secp256k1} = curve) do
     # Determine the prefix of the compressed public key and parse the x-coordinate from the compressed public key
     <<prefix::unsigned-integer-8>> <> x = compressed_pubkey
     x = :binary.decode_unsigned(x)
@@ -83,7 +80,7 @@ defmodule Tezex.Crypto.ECDSA do
       |> :binary.decode_unsigned()
 
     # Compute the right-hand side of the secp256k1 equation
-    y_squared = mod_add(x_squared, 7, p)
+    y_squared = Utils.mod_add(x_squared, 7, p)
 
     # Compute the square root of y_squared modulo p
     y = :crypto.mod_pow(y_squared, div(p + 1, 4), p) |> :binary.decode_unsigned()
@@ -93,12 +90,12 @@ defmodule Tezex.Crypto.ECDSA do
       if rem(prefix, 2) == 0 do
         # If the prefix is even, choose the even value of y
         y_even = y
-        y_odd = mod_sub(p, y_even, p)
+        y_odd = Utils.mod_sub(p, y_even, p)
         if rem(y_odd, 2) == 0, do: y_odd, else: y_even
       else
         # If the prefix is odd, choose the odd value of y
         y_odd = y
-        y_even = mod_sub(p, y_odd, p)
+        y_even = Utils.mod_sub(p, y_odd, p)
         if rem(y_even, 2) == 0, do: y_even, else: y_odd
       end
 
@@ -110,8 +107,8 @@ defmodule Tezex.Crypto.ECDSA do
 
   Parameters:
   - `message` [`binary`]: message that was signed
-  - `signature` [`%EllipticCurve.Signature{}`]: signature associated with the message
-  - `public_key` [`%EllipticCurve.PublicKey{}`]: public key associated with the message signer
+  - `signature` [`%Signature{}`]: signature associated with the message
+  - `public_key` [`%PublicKey{}`]: public key associated with the message signer
   - `options` [`kw list`]: refines request
     - `:hashfunc` [`fun/1`]: hash function applied to the message. Default: `fn msg -> :crypto.hash(:sha256, msg) end`
 
@@ -119,14 +116,12 @@ defmodule Tezex.Crypto.ECDSA do
   - verified [`bool`]: true if message, public key and signature are compatible, false otherwise
   """
   def verify?(message, signature, public_key, options \\ []) do
-    # basically https://github.com/starkbank/ecdsa-elixir/blob/ab5b3914ae2ee47cb87bdfe471871943c4761523/lib/ecdsa.ex#L77
-    # but with more customizable hashfunc
     %{hashfunc: hashfunc} =
       Enum.into(options, %{hashfunc: fn msg -> :crypto.hash(:sha256, msg) end})
 
     number_message =
       hashfunc.(message)
-      |> BinaryAscii.numberFromString()
+      |> Utils.number_from_string()
 
     curve_data = public_key.curve
 
@@ -136,14 +131,14 @@ defmodule Tezex.Crypto.ECDSA do
       Math.add(
         Math.multiply(
           curve_data."G",
-          IntegerUtils.modulo(number_message * inv, curve_data."N"),
+          Utils.mod(number_message * inv, curve_data."N"),
           curve_data."N",
           curve_data."A",
           curve_data."P"
         ),
         Math.multiply(
           public_key.point,
-          IntegerUtils.modulo(signature.r * inv, curve_data."N"),
+          Utils.mod(signature.r * inv, curve_data."N"),
           curve_data."N",
           curve_data."A",
           curve_data."P"
@@ -155,17 +150,9 @@ defmodule Tezex.Crypto.ECDSA do
     cond do
       signature.r < 1 or signature.r >= curve_data."N" -> false
       signature.s < 1 or signature.s >= curve_data."N" -> false
-      Point.isAtInfinity?(v) -> false
-      IntegerUtils.modulo(v.x, curve_data."N") != signature.r -> false
+      Point.is_at_infinity?(v) -> false
+      Utils.mod(v.x, curve_data."N") != signature.r -> false
       true -> true
     end
-  end
-
-  defp mod_add(left, right, modulus) do
-    rem(left + right, modulus)
-  end
-
-  defp mod_sub(left, right, modulus) do
-    rem(left - right, modulus)
   end
 end
