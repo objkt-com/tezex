@@ -1,12 +1,10 @@
 defmodule Tezex.Crypto.ECDSA.Test do
   use ExUnit.Case
 
-  alias Tezex.Crypto.ECDSA
-  alias EllipticCurve.Point
-  alias EllipticCurve.Curve.KnownCurves
+  alias Tezex.Crypto.{ECDSA, Point, KnownCurves}
 
   test "decode_point" do
-    curve = KnownCurves.getCurveByName(:prime256v1)
+    curve = KnownCurves.get_curve_by_name(:prime256v1)
 
     pk =
       <<2, 184, 135, 160, 166, 159, 170, 245, 126, 53, 185, 225, 207, 159, 136, 196, 23, 208, 233,

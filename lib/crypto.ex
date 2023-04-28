@@ -2,7 +2,7 @@ defmodule Tezex.Crypto do
   @moduledoc """
   A set of functions to check Tezos signed messages and verify a public key corresponds to a wallet address (public key hash).
   """
-  alias Tezex.Crypto.{Base58Check, ECDSA}
+  alias Tezex.Crypto.{Base58Check, ECDSA, Signature}
 
   @doc """
   Verify that `address` is the public key hash of `pubkey` and that `signature` is a valid signature for `message` signed with the private key corresponding to public key `pubkey`.
@@ -75,7 +75,7 @@ defmodule Tezex.Crypto do
     sig = decode_signature(signature)
 
     <<r::unsigned-integer-size(256), s::unsigned-integer-size(256)>> = sig
-    signature = %EllipticCurve.Signature{r: r, s: s}
+    signature = %Signature{r: r, s: s}
 
     message = :binary.decode_hex(msg)
 
@@ -94,7 +94,7 @@ defmodule Tezex.Crypto do
     <<54, 240, 44, 52>> <> <<sig::binary-size(64)>> <> _ = decode_base58(signature)
 
     <<r::unsigned-integer-size(256), s::unsigned-integer-size(256)>> = sig
-    signature = %EllipticCurve.Signature{r: r, s: s}
+    signature = %Signature{r: r, s: s}
 
     message = :binary.decode_hex(msg)
 
@@ -118,7 +118,8 @@ defmodule Tezex.Crypto do
       iex> Tezex.Crypto.check_address("tz1burnburnburnburnburnburnburjAYjjX", pubkey)
       {:error, :mismatch}
   """
-  @spec check_address(any, any) :: :ok | {:error, :mismatch | :unknown_pubkey_format}
+  @spec check_address(nonempty_binary, nonempty_binary) ::
+          :ok | {:error, :mismatch | :unknown_pubkey_format}
   def check_address(address, pubkey) do
     case derive_address(pubkey) do
       {:ok, ^address} ->
@@ -143,7 +144,8 @@ defmodule Tezex.Crypto do
       iex> Tezex.Crypto.derive_address("p2pk65yRxCX65k6qRPrbqGWvfW5JnLB1p3dn1oM5o9cyqLKPPhJaBMa")
       {:ok, "tz3bPFa6mGv8m4Ppn7w5KSDyAbEPwbJNpC9p"}
   """
-  @spec derive_address(binary) :: {:error, :unknown_pubkey_format} | {:ok, binary}
+  @spec derive_address(nonempty_binary) ::
+          {:error, :unknown_pubkey_format} | {:ok, nonempty_binary}
   def derive_address("edpk" <> _ = pubkey) do
     # tz1…
     pkh = <<6, 161, 159>>
