@@ -14,12 +14,8 @@ jobs:
       - uses: erlef/setup-elixir@v1
         id: beam
         with:
-          otp-version: 25.1.1
-          elixir-version: 1.14.0
-      - name: Update apt-get database
-        run: sudo apt-get update
-      - name: Install libsodium
-        run: sudo apt-get install -y libsodium-dev
+          otp-version: 25.2.3
+          elixir-version: 1.14.3
       - name: Cache mix deps
         uses: actions/cache@v3
         id: mix-cache
@@ -41,7 +37,7 @@ jobs:
           # build artifacts are stored in `./_build`
           path: |
             ./_build
-            !./_build/test/lib/objkt_repo
+            !./_build/test/lib/tezex
           key: ${{ runner.os }}-v1-build-${{ env.cache-name }}-${{ hashFiles('./mix.lock') }}
           restore-keys: |
             ${{ runner.os }}-v1-build-${{ env.cache-name }}-
