@@ -12,7 +12,6 @@ defmodule Tezex.MixProject do
       elixir: "~> 1.13",
       description: description(),
       package: package(),
-      start_permanent: Mix.env() == :prod,
       deps: deps(),
       test_coverage: [tool: ExCoveralls],
       preferred_cli_env: [
@@ -29,6 +28,7 @@ defmodule Tezex.MixProject do
         extras: ["README.md"]
       ],
       dialyzer: [
+        plt_add_apps: [:mix, :crypto],
         plt_file: {:no_warn, "priv/plts/dialyzer.plt"}
       ]
     ]
@@ -50,6 +50,8 @@ defmodule Tezex.MixProject do
     ]
   end
 
+  # Configuration for the OTP application.
+  #
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
@@ -61,8 +63,8 @@ defmodule Tezex.MixProject do
   defp deps do
     [
       {:base_58_check, "~> 1.0"},
+      {:blake2, "~> 1.0"},
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
-      {:enacl, "~> 1.2.1"},
       {:ex_doc, "~> 0.27", only: :dev, runtime: false},
       {:ex_unit_notifier, "~> 1.2", only: :test},
       {:excoveralls, "~> 0.15.1"},

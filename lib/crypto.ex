@@ -41,11 +41,11 @@ defmodule Tezex.Crypto do
   end
 
   defp hash_message(message) do
-    try do
-      iodata = :binary.decode_hex(message)
-      :enacl.generichash(32, iodata)
-    rescue
-      ArgumentError -> ""
+    iodata = :binary.decode_hex(message)
+
+    case Blake2.hash2b(iodata, 32) do
+      :error -> ""
+      bin -> bin
     end
   end
 
@@ -53,45 +53,35 @@ defmodule Tezex.Crypto do
   Verify that `signature` is a valid signature for `message` signed with the private key corresponding to public key `pubkey`
   """
   @spec verify_signature(binary, binary, binary) :: boolean
-  def verify_signature("ed" <> _sig = signature, message, pubkey) do
+  def verify_signature("ed" <> _ = signature, message, pubkey) do
     # tz1…
     message_hash = hash_message(message)
     signature = decode_signature(signature)
 
-    try do
-      pubkey =
-        pubkey
-        |> decode_base58()
-        |> binary_part(4, 32)
+    # <<0x0D, 0x0F, 0x25, 0xD9>>
+    <<13, 15, 37, 217, public_key::binary-size(32)>> <> _ = decode_base58(pubkey)
 
-      :enacl.sign_verify_detached(signature, message_hash, pubkey)
-    rescue
-      ArgumentError -> false
-    end
+    :crypto.verify(:eddsa, :none, message_hash, signature, [public_key, :ed25519])
   end
 
-  def verify_signature("sp" <> _sig = signature, msg, pubkey) do
+  def verify_signature("sp" <> _ = signature, msg, pubkey) do
     # tz2…
-    sig = decode_signature(signature)
-
-    <<r::unsigned-integer-size(256), s::unsigned-integer-size(256)>> = sig
+    <<r::unsigned-integer-size(256), s::unsigned-integer-size(256)>> = decode_signature(signature)
     signature = %Signature{r: r, s: s}
 
     message = :binary.decode_hex(msg)
 
     # <<0x03, 0xFE, 0xE2, 0x56>>
-    <<3, 254, 226, 86>> <> <<public_key::binary-size(33)>> <> _ = decode_base58(pubkey)
+    <<3, 254, 226, 86, public_key::binary-size(33)>> <> _ = decode_base58(pubkey)
 
     public_key = ECDSA.decode_public_key(public_key, :secp256k1)
 
-    ECDSA.verify?(message, signature, public_key,
-      hashfunc: fn msg -> :enacl.generichash(32, msg) end
-    )
+    ECDSA.verify?(message, signature, public_key, hashfunc: fn msg -> Blake2.hash2b(msg, 32) end)
   end
 
-  def verify_signature("p2" <> _sig = signature, msg, pubkey) do
+  def verify_signature("p2" <> _ = signature, msg, pubkey) do
     # tz3…
-    <<54, 240, 44, 52>> <> <<sig::binary-size(64)>> <> _ = decode_base58(signature)
+    <<54, 240, 44, 52, sig::binary-size(64)>> <> _ = decode_base58(signature)
 
     <<r::unsigned-integer-size(256), s::unsigned-integer-size(256)>> = sig
     signature = %Signature{r: r, s: s}
@@ -99,13 +89,11 @@ defmodule Tezex.Crypto do
     message = :binary.decode_hex(msg)
 
     # <<0x03, 0xB2, 0x8B, 0x7F>>
-    <<3, 178, 139, 127>> <> <<public_key::binary-size(33)>> <> _ = decode_base58(pubkey)
+    <<3, 178, 139, 127, public_key::binary-size(33)>> <> _ = decode_base58(pubkey)
 
     public_key = ECDSA.decode_public_key(public_key, :prime256v1)
 
-    ECDSA.verify?(message, signature, public_key,
-      hashfunc: fn msg -> :enacl.generichash(32, msg) end
-    )
+    ECDSA.verify?(message, signature, public_key, hashfunc: fn msg -> Blake2.hash2b(msg, 32) end)
   end
 
   @doc """
@@ -149,7 +137,7 @@ defmodule Tezex.Crypto do
   def derive_address("edpk" <> _ = pubkey) do
     # tz1…
     pkh = <<6, 161, 159>>
-    <<13, 15, 37, 217>> <> <<public_key::binary-size(32)>> <> _ = decode_base58(pubkey)
+    <<13, 15, 37, 217, public_key::binary-size(32)>> <> _ = decode_base58(pubkey)
 
     derive_address(public_key, pkh)
   end
@@ -157,7 +145,7 @@ defmodule Tezex.Crypto do
   def derive_address("sppk" <> _ = pubkey) do
     # tz2…
     pkh = <<6, 161, 161>>
-    <<3, 254, 226, 86>> <> <<public_key::binary-size(33)>> <> _ = decode_base58(pubkey)
+    <<3, 254, 226, 86, public_key::binary-size(33)>> <> _ = decode_base58(pubkey)
 
     derive_address(public_key, pkh)
   end
@@ -165,7 +153,7 @@ defmodule Tezex.Crypto do
   def derive_address("p2pk" <> _ = pubkey) do
     # tz3…
     pkh = <<6, 161, 164>>
-    <<3, 178, 139, 127>> <> <<public_key::binary-size(33)>> <> _ = decode_base58(pubkey)
+    <<3, 178, 139, 127, public_key::binary-size(33)>> <> _ = decode_base58(pubkey)
 
     derive_address(public_key, pkh)
   end
@@ -176,7 +164,7 @@ defmodule Tezex.Crypto do
 
   defp derive_address(pubkey, pkh) do
     derived =
-      :enacl.generichash(20, pubkey)
+      Blake2.hash2b(pubkey, 20)
       |> Tezex.Crypto.Base58Check.encode(pkh)
 
     {:ok, derived}
