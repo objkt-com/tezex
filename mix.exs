@@ -67,7 +67,7 @@ defmodule Tezex.MixProject do
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
       {:ex_doc, "~> 0.27", only: :dev, runtime: false},
       {:ex_unit_notifier, "~> 1.2", only: :test},
-      {:excoveralls, "~> 0.15.1"},
+      {:excoveralls, "~> 0.15.1", only: :test},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false}
     ]
   end
