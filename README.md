@@ -36,11 +36,6 @@ elixir 1.13.3-otp-24
 erlang 24.3.4
 ```
 
-This lib depends on [enacl](https://github.com/jlouis/enacl#installrequirements) which requires `libsodium` and other config/compilation tools.
-
-For macOS: `brew install libsodium gmp automake libtool gcc`.
-If you have an Apple Silicon processor take a look here: https://github.com/jlouis/enacl/issues/53 .
-
 ## Test
 
 ```sh
