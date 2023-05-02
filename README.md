@@ -15,7 +15,7 @@ The package can be installed by adding `tezex` to your list of dependencies in `
 ```elixir
 def deps do
   [
-    {:tezex, "~> 0.1.0"}
+    {:tezex, "~> 1.0.0"}
   ]
 end
 ```
