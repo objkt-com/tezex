@@ -30,7 +30,7 @@ defmodule Tezex.Micheline do
       iex> Tezex.Micheline.read_packed("0200e1d22c")
       %{int: -365_729}
   """
-  @spec read_packed(binary) :: map
+  @spec read_packed(binary) :: map | list(map)
   def read_packed(<<_::binary-size(2), rest::binary>>) do
     {val, _consumed} = hex_to_micheline(rest)
     val
@@ -47,7 +47,7 @@ defmodule Tezex.Micheline do
       iex> Tezex.Micheline.hex_to_micheline("00e1d22c")
       {%{int: -365729}, 8}
   """
-  @spec hex_to_micheline(binary) :: {map, pos_integer}
+  @spec hex_to_micheline(binary) :: {map | list(map), pos_integer}
   # literal int or nat
   def hex_to_micheline("00" <> rest) do
     {result, consumed} = Zarith.consume(rest)
@@ -61,23 +61,23 @@ defmodule Tezex.Micheline do
     {%{string: :binary.decode_hex(hex_string)}, length + 2}
   end
 
-  # array
+  # sequence
   def hex_to_micheline(<<"02", length::binary-size(8), rest::binary>>) do
     length = hex_to_dec(length) * 2
 
-    {array, consumed} =
+    {xs, consumed} =
       Stream.cycle([nil])
       |> Enum.reduce_while({[], rest, 0}, fn _, {acc, part, consumed} ->
         if consumed < length do
           {content, length} = hex_to_micheline(part)
           <<_consumed::binary-size(length), part::binary>> = part
-          {:cont, {acc ++ [content], part, consumed + length}}
+          {:cont, {[content | acc], part, consumed + length}}
         else
           {:halt, {acc, consumed}}
         end
       end)
 
-    {array, consumed + 8 + 2}
+    {Enum.reverse(xs), consumed + 8 + 2}
   end
 
   # primitive / no arg / no annot
