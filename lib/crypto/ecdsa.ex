@@ -105,7 +105,12 @@ defmodule Tezex.Crypto.ECDSA do
         # If the prefix is odd, choose the odd value of y
         y_odd = y
         y_even = Utils.mod_sub(p, y_odd, p)
-        if rem(y_even, 2) == 0, do: y_even, else: y_odd
+
+        if rem(y_even, 2) == 0 do
+          y_odd
+        else
+          y_even
+        end
       end
 
     %Point{x: x, y: y}
