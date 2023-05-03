@@ -99,8 +99,7 @@ defmodule Tezex.Crypto.Test do
     # modify one character in the valid signed message to make it invalid
     for {params, idx} <- Enum.with_index(@msg_sig_pubkey, 1) do
       try do
-        # replace the 21st character with '9'
-        msg = String.replace(params["message"], ~r/^(.{0,20})(.{1})(.*)/, "\\g{1}9\\g{3}")
+        msg = replace_nth_character(params["message"])
 
         refute Crypto.check_signature(
                  params["address"],
@@ -118,8 +117,7 @@ defmodule Tezex.Crypto.Test do
     # modify one character in the valid signature to make it invalid
     for {params, idx} <- Enum.with_index(@msg_sig_pubkey, 1) do
       try do
-        # replace the 21st character with '9'
-        sig = String.replace(params["signature"], ~r/^(.{0,20})(.{1})(.*)/, "\\g{1}9\\g{3}")
+        sig = replace_nth_character(params["signature"])
 
         refute Crypto.check_signature(
                  params["address"],
@@ -137,8 +135,7 @@ defmodule Tezex.Crypto.Test do
     # modify one character in the valid pubkey to make it invalid
     for {params, idx} <- Enum.with_index(@msg_sig_pubkey, 1) do
       try do
-        # replace the 21st character with '9'
-        pubkey = String.replace(params["pubkey"], ~r/^(.{0,20})(.{1})(.*)/, "\\g{1}9\\g{3}")
+        pubkey = replace_nth_character(params["pubkey"])
 
         refute Crypto.check_signature(
                  params["address"],
@@ -156,8 +153,7 @@ defmodule Tezex.Crypto.Test do
     # modify one character in the address to make it invalid
     for {params, idx} <- Enum.with_index(@msg_sig_pubkey, 1) do
       try do
-        # replace the 21st character with '9'
-        address = String.replace(params["address"], ~r/^(.{0,20})(.{1})(.*)/, "\\g{1}9\\g{3}")
+        address = replace_nth_character(params["address"])
 
         refute Crypto.check_signature(
                  address,
@@ -199,5 +195,18 @@ defmodule Tezex.Crypto.Test do
       assert {:error, :unknown_pubkey_format} ==
                Crypto.derive_address("a3pk65yRxCX65k6qRPrbqGWvfW5JnLB1p3dn1oM5o9cyqLKPPhJaBMa")
     end
+  end
+
+  defp replace_nth_character(input, n \\ 20) do
+    re = Regex.compile!("^(.{0,#{n}})(.{1})(.*)")
+
+    replacement =
+      if String.at(input, n) == "9" do
+        "8"
+      else
+        "9"
+      end
+
+    String.replace(input, re, "\\g{1}#{replacement}\\g{3}")
   end
 end
