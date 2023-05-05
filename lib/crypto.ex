@@ -1,6 +1,6 @@
 defmodule Tezex.Crypto do
   @moduledoc """
-  A set of functions to check Tezos signed messages and verify a public key corresponds to a wallet address (public key hash).
+  A set of functions to check Tezos signed messages, derive a pkh from a pubkey, verify that a public key corresponds to a wallet address (public key hash).
   """
   alias Tezex.Crypto.{Base58Check, ECDSA, Signature}
 
@@ -14,38 +14,24 @@ defmodule Tezex.Crypto do
       iex> message = "05010000007154657a6f73205369676e6564204d6573736167653a207369676e206d6520696e20617320747a32424338337076454161673672325a56376b5067684e41626a466f69716843765a78206f6e206f626a6b742e636f6d20617420323032312d31302d30345431383a35393a31332e3939305a"
       iex> public_key = "sppk7aBerAEA6tv4wzg6FnK7i5YrGtEGFVvNjWhc2QX8bhzpouBVFSW"
       iex> Tezex.Crypto.check_signature(address, signature, message, public_key)
-      true
+      :ok
       iex> Tezex.Crypto.check_signature(address_b, signature, message, public_key)
-      false
+      {:error, :address_mismatch}
       iex> Tezex.Crypto.check_signature(address, signature, "", public_key)
-      false
+      {:error, :bad_signature}
+      iex> Tezex.Crypto.check_signature(address, "x" <> signature, "", public_key)
+      {:error, :invalid_pubkey_format}
   """
-  @spec check_signature(binary, binary, binary, binary) :: boolean
+  @spec check_signature(binary, binary, binary, binary) ::
+          :ok | {:error, :address_mismatch | :invalid_pubkey_format | :bad_signature}
+
   def check_signature("tz" <> _ = address, signature, message, pubkey) do
     with :ok <- check_address(address, pubkey),
          true <- verify_signature(signature, message, pubkey) do
-      true
+      :ok
     else
-      _ -> false
-    end
-  end
-
-  defp decode_signature(data) do
-    data
-    |> decode_base58()
-    |> binary_part(5, 64)
-  end
-
-  defp decode_base58(data) do
-    Base58Check.decode58!(data)
-  end
-
-  defp hash_message(message) do
-    iodata = :binary.decode_hex(message)
-
-    case Blake2.hash2b(iodata, 32) do
-      :error -> ""
-      bin -> bin
+      false -> {:error, :bad_signature}
+      {:error, err} -> {:error, err}
     end
   end
 
@@ -59,7 +45,7 @@ defmodule Tezex.Crypto do
     signature = decode_signature(signature)
 
     # <<0x0D, 0x0F, 0x25, 0xD9>>
-    <<13, 15, 37, 217, public_key::binary-size(32)>> <> _ = decode_base58(pubkey)
+    <<13, 15, 37, 217, public_key::binary-size(32)>> <> _ = Base58Check.decode58!(pubkey)
 
     :crypto.verify(:eddsa, :none, message_hash, signature, [public_key, :ed25519])
   end
@@ -72,7 +58,7 @@ defmodule Tezex.Crypto do
     message = :binary.decode_hex(msg)
 
     # <<0x03, 0xFE, 0xE2, 0x56>>
-    <<3, 254, 226, 86, public_key::binary-size(33)>> <> _ = decode_base58(pubkey)
+    <<3, 254, 226, 86, public_key::binary-size(33)>> <> _ = Base58Check.decode58!(pubkey)
 
     public_key = ECDSA.decode_public_key(public_key, :secp256k1)
 
@@ -81,7 +67,7 @@ defmodule Tezex.Crypto do
 
   def verify_signature("p2" <> _ = signature, msg, pubkey) do
     # tz3…
-    <<54, 240, 44, 52, sig::binary-size(64)>> <> _ = decode_base58(signature)
+    <<54, 240, 44, 52, sig::binary-size(64)>> <> _ = Base58Check.decode58!(signature)
 
     <<r::unsigned-integer-size(256), s::unsigned-integer-size(256)>> = sig
     signature = %Signature{r: r, s: s}
@@ -89,11 +75,15 @@ defmodule Tezex.Crypto do
     message = :binary.decode_hex(msg)
 
     # <<0x03, 0xB2, 0x8B, 0x7F>>
-    <<3, 178, 139, 127, public_key::binary-size(33)>> <> _ = decode_base58(pubkey)
+    <<3, 178, 139, 127, public_key::binary-size(33)>> <> _ = Base58Check.decode58!(pubkey)
 
     public_key = ECDSA.decode_public_key(public_key, :prime256v1)
 
     ECDSA.verify?(message, signature, public_key, hashfunc: fn msg -> Blake2.hash2b(msg, 32) end)
+  end
+
+  def verify_signature(_, _, _) do
+    {:error, :invalid_pubkey_format}
   end
 
   @doc """
@@ -104,17 +94,19 @@ defmodule Tezex.Crypto do
       iex> Tezex.Crypto.check_address("tz2BC83pvEAag6r2ZV7kPghNAbjFoiqhCvZx", pubkey)
       :ok
       iex> Tezex.Crypto.check_address("tz1burnburnburnburnburnburnburjAYjjX", pubkey)
-      {:error, :mismatch}
+      {:error, :address_mismatch}
+      iex> Tezex.Crypto.check_address("tz2BC83pvEAag6r2ZV7kPghNAbjFoiqhCvZx", "x" <> pubkey)
+      {:error, :invalid_pubkey_format}
   """
   @spec check_address(nonempty_binary, nonempty_binary) ::
-          :ok | {:error, :mismatch | :unknown_pubkey_format}
+          :ok | {:error, :address_mismatch | :invalid_pubkey_format}
   def check_address(address, pubkey) do
     case derive_address(pubkey) do
       {:ok, ^address} ->
         :ok
 
       {:ok, _derived} ->
-        {:error, :mismatch}
+        {:error, :address_mismatch}
 
       err ->
         err
@@ -131,35 +123,33 @@ defmodule Tezex.Crypto do
       {:ok, "tz2BC83pvEAag6r2ZV7kPghNAbjFoiqhCvZx"}
       iex> Tezex.Crypto.derive_address("p2pk65yRxCX65k6qRPrbqGWvfW5JnLB1p3dn1oM5o9cyqLKPPhJaBMa")
       {:ok, "tz3bPFa6mGv8m4Ppn7w5KSDyAbEPwbJNpC9p"}
+      iex> Tezex.Crypto.derive_address("_p2pk65yRxCX65k6qRPrbqGWvfW5JnLB1p3dn1oM5o9cyqLKPPhJaBMa")
+      {:error, :invalid_pubkey_format}
+      iex> Tezex.Crypto.derive_address("p2pk65yRxCX65k6")
+      {:error, :invalid_pubkey_format}
   """
   @spec derive_address(nonempty_binary) ::
-          {:error, :unknown_pubkey_format} | {:ok, nonempty_binary}
-  def derive_address("edpk" <> _ = pubkey) do
-    # tz1…
-    pkh = <<6, 161, 159>>
-    <<13, 15, 37, 217, public_key::binary-size(32)>> <> _ = decode_base58(pubkey)
+          {:ok, nonempty_binary} | {:error, :invalid_pubkey_format}
+  def derive_address(pubkey) do
+    case Base58Check.decode58(pubkey) do
+      # tz1 addresses: "edpk" <> _
+      {:ok, <<13, 15, 37, 217, public_key::binary-size(32)>> <> _} ->
+        pkh = <<6, 161, 159>>
+        derive_address(public_key, pkh)
 
-    derive_address(public_key, pkh)
-  end
+      # tz2 addresses: "sppk" <> _
+      {:ok, <<3, 254, 226, 86, public_key::binary-size(33)>> <> _} ->
+        pkh = <<6, 161, 161>>
+        derive_address(public_key, pkh)
 
-  def derive_address("sppk" <> _ = pubkey) do
-    # tz2…
-    pkh = <<6, 161, 161>>
-    <<3, 254, 226, 86, public_key::binary-size(33)>> <> _ = decode_base58(pubkey)
+      # tz3 addresses: "p2pk" <> _
+      {:ok, <<3, 178, 139, 127, public_key::binary-size(33)>> <> _} ->
+        pkh = <<6, 161, 164>>
+        derive_address(public_key, pkh)
 
-    derive_address(public_key, pkh)
-  end
-
-  def derive_address("p2pk" <> _ = pubkey) do
-    # tz3…
-    pkh = <<6, 161, 164>>
-    <<3, 178, 139, 127, public_key::binary-size(33)>> <> _ = decode_base58(pubkey)
-
-    derive_address(public_key, pkh)
-  end
-
-  def derive_address(_) do
-    {:error, :unknown_pubkey_format}
+      _ ->
+        {:error, :invalid_pubkey_format}
+    end
   end
 
   defp derive_address(pubkey, pkh) do
@@ -168,5 +158,20 @@ defmodule Tezex.Crypto do
       |> Tezex.Crypto.Base58Check.encode(pkh)
 
     {:ok, derived}
+  end
+
+  defp decode_signature(data) do
+    data
+    |> Base58Check.decode58!()
+    |> binary_part(5, 64)
+  end
+
+  defp hash_message(message) do
+    iodata = :binary.decode_hex(message)
+
+    case Blake2.hash2b(iodata, 32) do
+      :error -> ""
+      bin -> bin
+    end
   end
 end

@@ -33,6 +33,14 @@ defmodule Tezex.Crypto.Base58Check do
 
   defp double_sha256(x), do: :crypto.hash(:sha256, :crypto.hash(:sha256, x))
 
+  def decode58(encoded) do
+    try do
+      {:ok, decode58!(encoded)}
+    rescue
+      _e in FunctionClauseError -> :error
+    end
+  end
+
   @doc """
   Decodes the given string.
 
