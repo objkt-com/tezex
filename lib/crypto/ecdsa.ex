@@ -52,7 +52,6 @@ defmodule Tezex.Crypto.ECDSA do
   @spec decode_point(nonempty_binary, Tezex.Crypto.Curve.t()) :: Tezex.Crypto.Point.t()
   def decode_point(compressed_pubkey, %Curve{name: :prime256v1} = curve) do
     prime = curve."P"
-
     b = curve."B"
 
     p_ident = div(prime + 1, 4)
@@ -100,7 +99,12 @@ defmodule Tezex.Crypto.ECDSA do
         # If the prefix is even, choose the even value of y
         y_even = y
         y_odd = Utils.mod_sub(p, y_even, p)
-        if rem(y_odd, 2) == 0, do: y_odd, else: y_even
+
+        if rem(y_odd, 2) == 0 do
+          y_odd
+        else
+          y_even
+        end
       else
         # If the prefix is odd, choose the odd value of y
         y_odd = y
