@@ -1,7 +1,7 @@
 # Changelog for Tezex
 
 
-## next
+## v1.0.0
 
 - [crypto]: remove dependency on NIF libsecp256k1
 - [crypto]: remove dependency on NIF enacl (libsodium)
