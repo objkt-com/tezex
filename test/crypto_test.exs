@@ -109,12 +109,13 @@ defmodule Tezex.Crypto.Test do
       try do
         msg = replace_nth_character(params["message"])
 
-        refute Crypto.check_signature(
-                 params["address"],
-                 params["signature"],
-                 msg,
-                 params["pubkey"]
-               )
+        assert {:error, :bad_signature} =
+                 Crypto.check_signature(
+                   params["address"],
+                   params["signature"],
+                   msg,
+                   params["pubkey"]
+                 )
       rescue
         err ->
           IO.inspect("sig check should have failed", label: idx)
@@ -127,12 +128,13 @@ defmodule Tezex.Crypto.Test do
       try do
         sig = replace_nth_character(params["signature"])
 
-        refute Crypto.check_signature(
-                 params["address"],
-                 sig,
-                 params["message"],
-                 params["pubkey"]
-               )
+        assert {:error, :bad_signature} =
+                 Crypto.check_signature(
+                   params["address"],
+                   sig,
+                   params["message"],
+                   params["pubkey"]
+                 )
       rescue
         err ->
           IO.inspect("sig check should have failed", label: idx)
@@ -145,12 +147,13 @@ defmodule Tezex.Crypto.Test do
       try do
         pubkey = replace_nth_character(params["pubkey"])
 
-        refute Crypto.check_signature(
-                 params["address"],
-                 params["signature"],
-                 params["message"],
-                 pubkey
-               )
+        assert {:error, :address_mismatch} =
+                 Crypto.check_signature(
+                   params["address"],
+                   params["signature"],
+                   params["message"],
+                   pubkey
+                 )
       rescue
         err ->
           IO.inspect("sig check should have failed", label: idx)
@@ -163,12 +166,13 @@ defmodule Tezex.Crypto.Test do
       try do
         address = replace_nth_character(params["address"])
 
-        refute Crypto.check_signature(
-                 address,
-                 params["signature"],
-                 params["message"],
-                 params["pubkey"]
-               )
+        assert {:error, :address_mismatch} =
+                 Crypto.check_signature(
+                   address,
+                   params["signature"],
+                   params["message"],
+                   params["pubkey"]
+                 )
       rescue
         err ->
           IO.inspect("sig check should have failed", label: idx)
@@ -200,7 +204,7 @@ defmodule Tezex.Crypto.Test do
     end
 
     test "key derivation -- invalid pubkey" do
-      assert {:error, :unknown_pubkey_format} ==
+      assert {:error, :invalid_pubkey_format} ==
                Crypto.derive_address("a3pk65yRxCX65k6qRPrbqGWvfW5JnLB1p3dn1oM5o9cyqLKPPhJaBMa")
     end
   end
