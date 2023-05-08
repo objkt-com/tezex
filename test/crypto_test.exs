@@ -89,12 +89,13 @@ defmodule Tezex.Crypto.Test do
   test "verifies valid signatures" do
     for {params, idx} <- Enum.with_index(@msg_sig_pubkey, 1) do
       try do
-        assert Crypto.check_signature(
-                 params["address"],
-                 params["signature"],
-                 params["message"],
-                 params["pubkey"]
-               )
+        assert :ok =
+                 Crypto.check_signature(
+                   params["address"],
+                   params["signature"],
+                   params["message"],
+                   params["pubkey"]
+                 )
       rescue
         err ->
           IO.inspect("sig check failed", label: idx)
