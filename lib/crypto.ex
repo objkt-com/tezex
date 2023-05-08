@@ -169,7 +169,7 @@ defmodule Tezex.Crypto do
       iex> Tezex.Crypto.encode_pubkey("tz1LPggcEZincSDQJUXrskwJPif4aJhWxMjd", "foo")
       :error
   """
-  @spec encode_pubkey(nonempty_binary, nonempty_binary) :: :error | nonempty_binary
+  @spec encode_pubkey(nonempty_binary, nonempty_binary) :: :error | {:ok, nonempty_binary}
   def encode_pubkey(pkh, hex_pubkey) do
     prefix =
       case pkh do
