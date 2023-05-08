@@ -160,6 +160,31 @@ defmodule Tezex.Crypto do
     {:ok, derived}
   end
 
+  @doc """
+  Encode a raw public key
+
+  ## Examples
+      iex> Tezex.Crypto.encode_pubkey("tz1LPggcEZincSDQJUXrskwJPif4aJhWxMjd", "52d396892b2489ec91406f83680b172b5ca42f606128cd4c44ea4d09d31aa524")
+      {:ok, "edpkuGhdSSNgqT92Gwoxt9vV3TmpQE93TtQSn5kkyULCh7cfeQFTno"}
+      iex> Tezex.Crypto.encode_pubkey("tz1LPggcEZincSDQJUXrskwJPif4aJhWxMjd", "foo")
+      :error
+  """
+  @spec encode_pubkey(nonempty_binary, nonempty_binary) :: :error | nonempty_binary
+  def encode_pubkey(pkh, hex_pubkey) do
+    prefix =
+      case pkh do
+        "tz1" <> _ -> <<13, 15, 37, 217>>
+        "tz2" <> _ -> <<3, 254, 226, 86>>
+        "tz3" <> _ -> <<3, 178, 139, 127>>
+        _ -> :error
+      end
+
+    with prefix when is_binary(prefix) <- prefix,
+         {:ok, bin_pubkey} <- Base.decode16(String.upcase(hex_pubkey)) do
+      {:ok, Tezex.Crypto.Base58Check.encode(bin_pubkey, prefix)}
+    end
+  end
+
   defp decode_signature(data) do
     data
     |> Base58Check.decode58!()
