@@ -210,6 +210,32 @@ defmodule Tezex.Micheline do
     {text, length + 8}
   end
 
+  @doc """
+  Decode optimized Micheline representation of an address value
+
+  ## Examples
+      iex> Tezex.Micheline.hex_to_address("00007fc95c97fd368cd9055610ee79e64ff9e0b5285c")
+      {:ok, "tz1XHhjLXQuG9rf9n7o1VbgegMkiggy1oktu"}
+      iex> Tezex.Micheline.hex_to_address("10007fc95c97fd368cd9055610ee79e64ff9e0b5285c")
+      {:error, :invalid}
+  """
+  @spec hex_to_address(<<_::_*16>>) :: {:error, :invalid} | {:ok, nonempty_binary()}
+  def hex_to_address(hex) do
+    {prefix, pkh} =
+      case :binary.decode_hex(hex) do
+        <<0, 0, pkh::binary-size(20)>> -> {<<6, 161, 159>>, pkh}
+        <<0, 1, pkh::binary-size(20)>> -> {<<6, 161, 161>>, pkh}
+        <<0, 2, pkh::binary-size(20)>> -> {<<6, 161, 164>>, pkh}
+        <<1, pkh::binary-size(20), 0>> -> {<<2, 90, 121>>, pkh}
+        _ -> {:error, :invalid}
+      end
+
+    case {prefix, pkh} do
+      {:error, :invalid} -> {:error, :invalid}
+      {prefix, pkh} -> {:ok, Tezex.Crypto.Base58Check.encode(pkh, prefix)}
+    end
+  end
+
   defp code_to_kw(code) when is_integer(code) do
     {Enum.at(@kw, code), 2}
   end
