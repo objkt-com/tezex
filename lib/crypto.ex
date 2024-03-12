@@ -4,6 +4,13 @@ defmodule Tezex.Crypto do
   """
   alias Tezex.Crypto.{Base58Check, ECDSA, Signature}
 
+  @prefixes %{
+    eddsa: <<43, 246, 78, 7>>
+  }
+  @prefixes_sig %{
+    eddsa: <<4, 130, 43>>
+  }
+
   @doc """
   Verify that `address` is the public key hash of `pubkey` and that `signature` is a valid signature for `message` signed with the private key corresponding to public key `pubkey`.
 
@@ -183,6 +190,19 @@ defmodule Tezex.Crypto do
          {:ok, bin_pubkey} <- Base.decode16(String.upcase(hex_pubkey)) do
       {:ok, Tezex.Crypto.Base58Check.encode(bin_pubkey, prefix)}
     end
+  end
+
+  defp decode_privkey("edsk" <> _ = key) do
+    key = Base58Check.decode58!(key)
+    binary_part(key, byte_size(@prefixes.eddsa), 32)
+  end
+
+  def sign("edsk" <> _ = secret_key, bytes, watermark \\ <<>>) do
+    msg = watermark <> :binary.decode_hex(bytes)
+    bytes_hash = Blake2.hash2b(msg, 32)
+    decoded_key = decode_privkey(secret_key)
+    signature = :crypto.sign(:eddsa, :none, bytes_hash, [decoded_key, :ed25519])
+    Base58Check.encode(signature, @prefixes_sig.eddsa)
   end
 
   defp decode_signature(data) do
