@@ -191,7 +191,7 @@ defmodule Tezex.Crypto.ECDSA do
     ns1 = :binary.encode_unsigned(curve_data."N" - 1)
     nh = curve_data."N" >>> 1
 
-    drbg = HMACDRBG.new(private_key.secret, message)
+    drbg = HMACDRBG.init(private_key.secret, message)
 
     message = Utils.truncate_to_n(number_message, curve_data."N")
 

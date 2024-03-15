@@ -6,7 +6,7 @@ defmodule Tezex.Crypto.HMACDRBG.Test do
     entropy = "totally random0123456789"
     nonce = "secret nonce"
     pers = "my drbg"
-    drbg = HMACDRBG.new(entropy, nonce, pers)
+    drbg = HMACDRBG.init(entropy, nonce, pers)
 
     {result, _} = HMACDRBG.generate(drbg)
 
@@ -17,7 +17,7 @@ defmodule Tezex.Crypto.HMACDRBG.Test do
   test "test sha256 2" do
     entropy = "totally random0123456789"
     nonce = "secret nonce"
-    drbg = HMACDRBG.new(entropy, nonce)
+    drbg = HMACDRBG.init(entropy, nonce)
 
     {result, _} = HMACDRBG.generate(drbg)
 
@@ -30,8 +30,8 @@ defmodule Tezex.Crypto.HMACDRBG.Test do
     nonce = "nonce"
     pers = "pers"
 
-    drbg_original = HMACDRBG.new(entropy, nonce, pers)
-    drbg_reseed = HMACDRBG.new(entropy, nonce, pers)
+    drbg_original = HMACDRBG.init(entropy, nonce, pers)
+    drbg_reseed = HMACDRBG.init(entropy, nonce, pers)
 
     {result_original, _} = HMACDRBG.generate(drbg_original)
     {result_reseeded, drbg_reseed} = HMACDRBG.generate(drbg_reseed)
