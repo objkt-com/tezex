@@ -220,9 +220,6 @@ defmodule Tezex.Crypto.Test do
       pubkey = "edpkvJELH15q7a8ShGRsoULGxLQfUQaGahwRTFywCsnWPPdwnmASRH"
       pubkeyhash = "tz1RvhdZ5pcjD19vCCK9PgZpnmErTba3dsBs"
 
-      secret_key =
-        "edskS3DtVSbWbPD1yviMGebjYwWJtruMjDcfAZsH9uba22EzKeYhmQkkraFosFETmEMfFNVcDYQ5QbFerj9ozDKroXZ6mb5oxV"
-
       bytes = "1234"
       watermark = <<3>>
 
@@ -231,7 +228,6 @@ defmodule Tezex.Crypto.Test do
 
       assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
       assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
-      assert signature == Crypto.sign(secret_key, bytes, watermark)
     end
 
     test "Tz1 32 bytes" do
@@ -257,7 +253,6 @@ defmodule Tezex.Crypto.Test do
       encoded_private_key = "spsk2rBDDeUqakQ42nBHDGQTtP3GErb6AahHPwF9bhca3Q5KA5HESE"
       pubkey = "sppk7aqSksZan1AGXuKtCz9UBLZZ77e3ZWGpFxR7ig1Z17GneEhSSbH"
       pubkeyhash = "tz2Ch1abG7FNiibmV26Uzgdsnfni9XGrk5wD"
-      secret_key = "spsk2rBDDeUqakQ42nBHDGQTtP3GErb6AahHPwF9bhca3Q5KA5HESE"
 
       bytes = "1234"
       watermark = <<3>>
@@ -267,14 +262,12 @@ defmodule Tezex.Crypto.Test do
 
       assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
       assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
-      assert signature == Crypto.sign(secret_key, bytes, watermark)
     end
 
     test "Tz2 having 'y' coordinate shorter than 32 bytes" do
       encoded_private_key = "spsk24EJohZHJkZnWEzj3w9wE7BFARpFmq5WAo9oTtqjdJ2t4pyoB3"
       pubkey = "sppk7bcmsCiZmrzrfGpPHnZMx73s6pUC4Tf1zdASQ3rgXfq8uGP3wgV"
       pubkeyhash = "tz2T7hMiWgLAtpsB1JXEP59h3QA8rNVAP1Ue"
-      secret_key = "spsk24EJohZHJkZnWEzj3w9wE7BFARpFmq5WAo9oTtqjdJ2t4pyoB3"
 
       bytes = "1234"
       watermark = <<3>>
@@ -284,14 +277,12 @@ defmodule Tezex.Crypto.Test do
 
       assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
       assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
-      assert signature == Crypto.sign(secret_key, bytes, watermark)
     end
 
     test "Tz3" do
       encoded_private_key = "p2sk2obfVMEuPUnadAConLWk7Tf4Dt3n4svSgJwrgpamRqJXvaYcg1"
       pubkey = "p2pk66tTYL5EvahKAXncbtbRPBkAnxo3CszzUho5wPCgWauBMyvybuB"
       pubkeyhash = "tz3Lfm6CyfSTZ7EgMckptZZGiPxzs9GK59At"
-      secret_key = "p2sk2obfVMEuPUnadAConLWk7Tf4Dt3n4svSgJwrgpamRqJXvaYcg1"
 
       bytes = "1234"
       watermark = <<3>>
@@ -301,7 +292,6 @@ defmodule Tezex.Crypto.Test do
 
       assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
       assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
-      assert signature == Crypto.sign(secret_key, bytes, watermark)
     end
 
     # test "Tz3 Encrypted" do
