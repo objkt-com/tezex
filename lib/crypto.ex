@@ -14,12 +14,17 @@ defmodule Tezex.Crypto do
   @prefix_edpk <<13, 15, 37, 217>>
   @prefix_sppk <<3, 254, 226, 86>>
   @prefix_p2pk <<3, 178, 139, 127>>
+  # public key hash
+  @prefix_tz1 <<6, 161, 159>>
+  @prefix_tz2 <<6, 161, 161>>
+  @prefix_tz3 <<6, 161, 164>>
   # private key
   @prefix_edsk <<43, 246, 78, 7>>
   @prefix_spsk <<17, 162, 224, 201>>
   @prefix_p2sk <<16, 81, 238, 189>>
   # sig
   @prefix_sig <<4, 130, 43>>
+  @prefix_p2sig <<54, 240, 44, 52>>
 
   @doc """
   Verify that `address` is the public key hash of `pubkey` and that `signature` is a valid signature for `message` signed with the private key corresponding to public key `pubkey`.
@@ -84,7 +89,7 @@ defmodule Tezex.Crypto do
 
   def verify_signature("p2" <> _ = signature, msg, pubkey) do
     # tz3…
-    <<54, 240, 44, 52, sig::binary-size(64)>> <> _ = Base58Check.decode58!(signature)
+    <<@prefix_p2sig, sig::binary-size(64)>> <> _ = Base58Check.decode58!(signature)
 
     <<r::unsigned-integer-size(256), s::unsigned-integer-size(256)>> = sig
     signature = %Signature{r: r, s: s}
@@ -151,18 +156,15 @@ defmodule Tezex.Crypto do
     case Base58Check.decode58(pubkey) do
       # tz1 addresses: "edpk" <> _
       {:ok, <<@prefix_edpk, public_key::binary-size(32)>> <> _} ->
-        pkh = <<6, 161, 159>>
-        derive_address(public_key, pkh)
+        derive_address(public_key, @prefix_tz1)
 
       # tz2 addresses: "sppk" <> _
       {:ok, <<@prefix_sppk, public_key::binary-size(33)>> <> _} ->
-        pkh = <<6, 161, 161>>
-        derive_address(public_key, pkh)
+        derive_address(public_key, @prefix_tz2)
 
       # tz3 addresses: "p2pk" <> _
       {:ok, <<@prefix_p2pk, public_key::binary-size(33)>> <> _} ->
-        pkh = <<6, 161, 164>>
-        derive_address(public_key, pkh)
+        derive_address(public_key, @prefix_tz3)
 
       _ ->
         {:error, :invalid_pubkey_format}
@@ -211,6 +213,7 @@ defmodule Tezex.Crypto do
       case key do
         "edsk" <> _ -> @prefix_edsk
         "spsk" <> _ -> @prefix_spsk
+        "p2sk" <> _ -> @prefix_p2sk
       end
 
     key = Base58Check.decode58!(key)
@@ -231,6 +234,20 @@ defmodule Tezex.Crypto do
 
       "spsk" <> _ ->
         pk = %PrivateKey{secret: decoded_key, curve: KnownCurves.secp256k1()}
+        s = ECDSA.sign(watermark <> msg, pk, hashfunc: fn msg -> Blake2.hash2b(msg, 32) end)
+
+        r_bin = Integer.to_string(s.r, 16)
+        s_bin = Integer.to_string(s.s, 16)
+
+        r_bin = Utils.pad(r_bin, 64, :leading)
+        s_bin = Utils.pad(s_bin, 64, :leading)
+
+        signature = :binary.decode_hex(r_bin <> s_bin)
+
+        Base58Check.encode(signature, @prefix_sig)
+
+      "p2sk" <> _ ->
+        pk = %PrivateKey{secret: decoded_key, curve: KnownCurves.prime256v1()}
         s = ECDSA.sign(watermark <> msg, pk, hashfunc: fn msg -> Blake2.hash2b(msg, 32) end)
 
         r_bin = Integer.to_string(s.r, 16)

@@ -287,22 +287,22 @@ defmodule Tezex.Crypto.Test do
       assert signature == Crypto.sign(secret_key, bytes, watermark)
     end
 
-    # test "Tz3" do
-    #   encoded_private_key = "p2sk2obfVMEuPUnadAConLWk7Tf4Dt3n4svSgJwrgpamRqJXvaYcg1"
-    #   pubkey = "p2pk66tTYL5EvahKAXncbtbRPBkAnxo3CszzUho5wPCgWauBMyvybuB"
-    #   pubkeyhash = "tz3Lfm6CyfSTZ7EgMckptZZGiPxzs9GK59At"
-    #   secret_key = "p2sk2obfVMEuPUnadAConLWk7Tf4Dt3n4svSgJwrgpamRqJXvaYcg1"
+    test "Tz3" do
+      encoded_private_key = "p2sk2obfVMEuPUnadAConLWk7Tf4Dt3n4svSgJwrgpamRqJXvaYcg1"
+      pubkey = "p2pk66tTYL5EvahKAXncbtbRPBkAnxo3CszzUho5wPCgWauBMyvybuB"
+      pubkeyhash = "tz3Lfm6CyfSTZ7EgMckptZZGiPxzs9GK59At"
+      secret_key = "p2sk2obfVMEuPUnadAConLWk7Tf4Dt3n4svSgJwrgpamRqJXvaYcg1"
 
-    #   bytes = "1234"
-    #   watermark = <<3>>
+      bytes = "1234"
+      watermark = <<3>>
 
-    #   signature =
-    #     "sigRUobRZ4oG7CvdtQfNoDe3Gqn8zrLw6RXjXVa84rX3HMzWuCuncWgDqY8wRkssofLUsfbdR6MNGJzDWaNXEwTxDktfrKmj"
+      signature =
+        "sigRUobRZ4oG7CvdtQfNoDe3Gqn8zrLw6RXjXVa84rX3HMzWuCuncWgDqY8wRkssofLUsfbdR6MNGJzDWaNXEwTxDktfrKmj"
 
-    #   assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
-    #   assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
-    #   assert signature == Crypto.sign(secret_key, bytes, watermark)
-    # end
+      assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
+      assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
+      assert signature == Crypto.sign(secret_key, bytes, watermark)
+    end
 
     # test "Tz3 Encrypted" do
     #   encoded_private_key =
