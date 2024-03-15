@@ -4,7 +4,8 @@ defmodule Tezex.Crypto.KnownCurves do
   Describes the elliptic curves supported by the package
   """
 
-  alias Tezex.Crypto.{Curve, Point}
+  alias Tezex.Crypto.Curve
+  alias Tezex.Crypto.Point
 
   @secp256k1name :secp256k1
   @prime256v1name :prime256v1

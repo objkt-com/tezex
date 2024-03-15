@@ -253,48 +253,39 @@ defmodule Tezex.Crypto.Test do
       assert signature == Crypto.sign(secret_key, bytes, watermark)
     end
 
-    # test "Tz2" do
-    #   encoded_private_key = "spsk2rBDDeUqakQ42nBHDGQTtP3GErb6AahHPwF9bhca3Q5KA5HESE"
-    #   pubkey = "sppk7aqSksZan1AGXuKtCz9UBLZZ77e3ZWGpFxR7ig1Z17GneEhSSbH"
-    #   pubkeyhash = "tz2Ch1abG7FNiibmV26Uzgdsnfni9XGrk5wD"
-    #   secret_key = "spsk2rBDDeUqakQ42nBHDGQTtP3GErb6AahHPwF9bhca3Q5KA5HESE"
+    test "Tz2" do
+      encoded_private_key = "spsk2rBDDeUqakQ42nBHDGQTtP3GErb6AahHPwF9bhca3Q5KA5HESE"
+      pubkey = "sppk7aqSksZan1AGXuKtCz9UBLZZ77e3ZWGpFxR7ig1Z17GneEhSSbH"
+      pubkeyhash = "tz2Ch1abG7FNiibmV26Uzgdsnfni9XGrk5wD"
+      secret_key = "spsk2rBDDeUqakQ42nBHDGQTtP3GErb6AahHPwF9bhca3Q5KA5HESE"
 
-    #   bytes = "1234"
-    #   watermark = <<3>>
+      bytes = "1234"
+      watermark = <<3>>
 
-    #   signature =
-    #     "sigREwM1SuRN5WzjH5xGJuyeZQ9kWi8XtbA4wRqGTumJwNY18PmF1XQMLCXEQBr4frnriKHWdPUynF1vGUvPcoWrNjb3s5xp"
+      signature =
+        "sigREwM1SuRN5WzjH5xGJuyeZQ9kWi8XtbA4wRqGTumJwNY18PmF1XQMLCXEQBr4frnriKHWdPUynF1vGUvPcoWrNjb3s5xp"
 
-    #   assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
-    #   assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
-    #   assert signature == Crypto.sign(secret_key, bytes, watermark)
-    # end
+      assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
+      assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
+      assert signature == Crypto.sign(secret_key, bytes, watermark)
+    end
 
-    # test "Tz2 with bytes producing public key that needs padding" do
-    #   encoded_private_key = "spsk33kCcKpgrvXRQJB2GVGxAMxrSEmwKXLh2KR4ztLcbaCnQq3FFs"
-    #   pubkeyhash = "tz2JFbdFh1RVYuYX4gWbVQz9SAtqEZSwZaB8"
-    #   pubkey = "sppk7bFd7b4DWcabg4yw4N5q8rn9thycWmY21EJDCKfTskNiBH8RJrd"
-    #   assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
-    #   # assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
-    #   # assert signature == Crypto.sign(secret_key, bytes, watermark)
-    # end
+    test "Tz2 having 'y' coordinate shorter than 32 bytes" do
+      encoded_private_key = "spsk24EJohZHJkZnWEzj3w9wE7BFARpFmq5WAo9oTtqjdJ2t4pyoB3"
+      pubkey = "sppk7bcmsCiZmrzrfGpPHnZMx73s6pUC4Tf1zdASQ3rgXfq8uGP3wgV"
+      pubkeyhash = "tz2T7hMiWgLAtpsB1JXEP59h3QA8rNVAP1Ue"
+      secret_key = "spsk24EJohZHJkZnWEzj3w9wE7BFARpFmq5WAo9oTtqjdJ2t4pyoB3"
 
-    # test "Tz2 having 'y' coordinate shorter than 32 bytes" do
-    #   encoded_private_key = "spsk24EJohZHJkZnWEzj3w9wE7BFARpFmq5WAo9oTtqjdJ2t4pyoB3"
-    #   pubkey = "sppk7bcmsCiZmrzrfGpPHnZMx73s6pUC4Tf1zdASQ3rgXfq8uGP3wgV"
-    #   pubkeyhash = "tz2T7hMiWgLAtpsB1JXEP59h3QA8rNVAP1Ue"
-    #   secret_key = "spsk24EJohZHJkZnWEzj3w9wE7BFARpFmq5WAo9oTtqjdJ2t4pyoB3"
+      bytes = "1234"
+      watermark = <<3>>
 
-    #   bytes = "1234"
-    #   watermark = <<3>>
+      signature =
+        "sigmVKa3AcvzDTPGD7rJXkrMh8XMVkVQUkLwGLL3h1APWgicRKBmgjZ3624vqHA2FufBrLTQuPS9YBN1h2Z16kexp9F8NRXp"
 
-    #   signature =
-    #     "sigmVKa3AcvzDTPGD7rJXkrMh8XMVkVQUkLwGLL3h1APWgicRKBmgjZ3624vqHA2FufBrLTQuPS9YBN1h2Z16kexp9F8NRXp"
-
-    #   assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
-    #   assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
-    #   assert signature == Crypto.sign(secret_key, bytes, watermark)
-    # end
+      assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
+      assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
+      assert signature == Crypto.sign(secret_key, bytes, watermark)
+    end
 
     # test "Tz3" do
     #   encoded_private_key = "p2sk2obfVMEuPUnadAConLWk7Tf4Dt3n4svSgJwrgpamRqJXvaYcg1"

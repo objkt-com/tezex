@@ -1,7 +1,9 @@
 defmodule Tezex.Crypto.ECDSA.Test do
   use ExUnit.Case
 
-  alias Tezex.Crypto.{ECDSA, Point, KnownCurves}
+  alias Tezex.Crypto.ECDSA
+  alias Tezex.Crypto.KnownCurves
+  alias Tezex.Crypto.Point
 
   test "decode_point" do
     curve = KnownCurves.get_curve_by_name(:prime256v1)

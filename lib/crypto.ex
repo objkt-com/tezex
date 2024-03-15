@@ -2,14 +2,24 @@ defmodule Tezex.Crypto do
   @moduledoc """
   A set of functions to check Tezos signed messages, derive a pkh from a pubkey, verify that a public key corresponds to a wallet address (public key hash).
   """
-  alias Tezex.Crypto.{Base58Check, ECDSA, Signature}
 
-  @prefixes %{
-    eddsa: <<43, 246, 78, 7>>
-  }
-  @prefixes_sig %{
-    eddsa: <<4, 130, 43>>
-  }
+  alias Tezex.Crypto.KnownCurves
+  alias Tezex.Crypto.Base58Check
+  alias Tezex.Crypto.ECDSA
+  alias Tezex.Crypto.PrivateKey
+  alias Tezex.Crypto.Signature
+  alias Tezex.Crypto.Utils
+
+  # public key
+  @prefix_edpk <<13, 15, 37, 217>>
+  @prefix_sppk <<3, 254, 226, 86>>
+  @prefix_p2pk <<3, 178, 139, 127>>
+  # private key
+  @prefix_edsk <<43, 246, 78, 7>>
+  @prefix_spsk <<17, 162, 224, 201>>
+  @prefix_p2sk <<16, 81, 238, 189>>
+  # sig
+  @prefix_sig <<4, 130, 43>>
 
   @doc """
   Verify that `address` is the public key hash of `pubkey` and that `signature` is a valid signature for `message` signed with the private key corresponding to public key `pubkey`.
@@ -52,7 +62,7 @@ defmodule Tezex.Crypto do
     signature = decode_signature(signature)
 
     # <<0x0D, 0x0F, 0x25, 0xD9>>
-    <<13, 15, 37, 217, public_key::binary-size(32)>> <> _ = Base58Check.decode58!(pubkey)
+    <<@prefix_edpk, public_key::binary-size(32)>> <> _ = Base58Check.decode58!(pubkey)
 
     :crypto.verify(:eddsa, :none, message_hash, signature, [public_key, :ed25519])
   end
@@ -65,7 +75,7 @@ defmodule Tezex.Crypto do
     message = :binary.decode_hex(msg)
 
     # <<0x03, 0xFE, 0xE2, 0x56>>
-    <<3, 254, 226, 86, public_key::binary-size(33)>> <> _ = Base58Check.decode58!(pubkey)
+    <<@prefix_sppk, public_key::binary-size(33)>> <> _ = Base58Check.decode58!(pubkey)
 
     public_key = ECDSA.decode_public_key(public_key, :secp256k1)
 
@@ -82,7 +92,7 @@ defmodule Tezex.Crypto do
     message = :binary.decode_hex(msg)
 
     # <<0x03, 0xB2, 0x8B, 0x7F>>
-    <<3, 178, 139, 127, public_key::binary-size(33)>> <> _ = Base58Check.decode58!(pubkey)
+    <<@prefix_p2pk, public_key::binary-size(33)>> <> _ = Base58Check.decode58!(pubkey)
 
     public_key = ECDSA.decode_public_key(public_key, :prime256v1)
 
@@ -140,17 +150,17 @@ defmodule Tezex.Crypto do
   def derive_address(pubkey) do
     case Base58Check.decode58(pubkey) do
       # tz1 addresses: "edpk" <> _
-      {:ok, <<13, 15, 37, 217, public_key::binary-size(32)>> <> _} ->
+      {:ok, <<@prefix_edpk, public_key::binary-size(32)>> <> _} ->
         pkh = <<6, 161, 159>>
         derive_address(public_key, pkh)
 
       # tz2 addresses: "sppk" <> _
-      {:ok, <<3, 254, 226, 86, public_key::binary-size(33)>> <> _} ->
+      {:ok, <<@prefix_sppk, public_key::binary-size(33)>> <> _} ->
         pkh = <<6, 161, 161>>
         derive_address(public_key, pkh)
 
       # tz3 addresses: "p2pk" <> _
-      {:ok, <<3, 178, 139, 127, public_key::binary-size(33)>> <> _} ->
+      {:ok, <<@prefix_p2pk, public_key::binary-size(33)>> <> _} ->
         pkh = <<6, 161, 164>>
         derive_address(public_key, pkh)
 
@@ -162,7 +172,7 @@ defmodule Tezex.Crypto do
   defp derive_address(pubkey, pkh) do
     derived =
       Blake2.hash2b(pubkey, 20)
-      |> Tezex.Crypto.Base58Check.encode(pkh)
+      |> Base58Check.encode(pkh)
 
     {:ok, derived}
   end
@@ -180,29 +190,59 @@ defmodule Tezex.Crypto do
   def encode_pubkey(pkh, hex_pubkey) do
     prefix =
       case pkh do
-        "tz1" <> _ -> <<13, 15, 37, 217>>
-        "tz2" <> _ -> <<3, 254, 226, 86>>
-        "tz3" <> _ -> <<3, 178, 139, 127>>
+        "tz1" <> _ -> @prefix_edpk
+        "tz2" <> _ -> @prefix_sppk
+        "tz3" <> _ -> @prefix_p2pk
         _ -> :error
       end
 
     with prefix when is_binary(prefix) <- prefix,
          {:ok, bin_pubkey} <- Base.decode16(String.upcase(hex_pubkey)) do
-      {:ok, Tezex.Crypto.Base58Check.encode(bin_pubkey, prefix)}
+      {:ok, Base58Check.encode(bin_pubkey, prefix)}
     end
   end
 
-  defp decode_privkey("edsk" <> _ = key) do
+  defp decode_privkey(key, passphrase \\ nil) do
+    if binary_part(key, 2, 1) == "e" and is_nil(passphrase) do
+      throw("missing passphrase")
+    end
+
+    prefix =
+      case key do
+        "edsk" <> _ -> @prefix_edsk
+        "spsk" <> _ -> @prefix_spsk
+      end
+
     key = Base58Check.decode58!(key)
-    binary_part(key, byte_size(@prefixes.eddsa), 32)
+
+    binary_part(key, byte_size(prefix), 32)
+    |> Utils.pad(32, :leading)
   end
 
-  def sign("edsk" <> _ = secret_key, bytes, watermark \\ <<>>) do
-    msg = watermark <> :binary.decode_hex(bytes)
-    bytes_hash = Blake2.hash2b(msg, 32)
+  def sign(secret_key, bytes, watermark \\ <<>>) do
+    msg = :binary.decode_hex(bytes)
     decoded_key = decode_privkey(secret_key)
-    signature = :crypto.sign(:eddsa, :none, bytes_hash, [decoded_key, :ed25519])
-    Base58Check.encode(signature, @prefixes_sig.eddsa)
+
+    case secret_key do
+      "edsk" <> _ ->
+        bytes_hash = Blake2.hash2b(watermark <> msg, 32)
+        signature = :crypto.sign(:eddsa, :none, bytes_hash, [decoded_key, :ed25519])
+        Base58Check.encode(signature, @prefix_sig)
+
+      "spsk" <> _ ->
+        pk = %PrivateKey{secret: decoded_key, curve: KnownCurves.secp256k1()}
+        s = ECDSA.sign(watermark <> msg, pk, hashfunc: fn msg -> Blake2.hash2b(msg, 32) end)
+
+        r_bin = Integer.to_string(s.r, 16)
+        s_bin = Integer.to_string(s.s, 16)
+
+        r_bin = Utils.pad(r_bin, 64, :leading)
+        s_bin = Utils.pad(s_bin, 64, :leading)
+
+        signature = :binary.decode_hex(r_bin <> s_bin)
+
+        Base58Check.encode(signature, @prefix_sig)
+    end
   end
 
   defp decode_signature(data) do

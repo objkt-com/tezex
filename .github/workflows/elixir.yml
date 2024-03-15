@@ -14,8 +14,8 @@ jobs:
       - uses: erlef/setup-elixir@v1
         id: beam
         with:
-          otp-version: 25.2.3
-          elixir-version: 1.14.3
+          version-file: .tool-versions
+          version-type: strict
       - name: Cache mix deps
         uses: actions/cache@v3
         id: mix-cache

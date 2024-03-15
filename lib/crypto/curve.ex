@@ -22,4 +22,18 @@ defmodule Tezex.Crypto.Curve do
           N: non_neg_integer,
           G: Point.t()
         }
+
+  @doc """
+  Get the curve length
+
+  Parameters:
+  - `curve` [%Tezex.Crypto.Curve]: curve data
+
+  Returns:
+  - `length` [integer]: curve length
+  """
+  @spec get_length(t()) :: non_neg_integer()
+  def get_length(curve) do
+    div(1 + String.length(Integer.to_string(curve."N", 16)), 2)
+  end
 end

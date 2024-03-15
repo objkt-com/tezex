@@ -3,15 +3,17 @@ defmodule Tezex.Crypto.ECDSA do
   Decode compressed public key and verify signatures using the Elliptic Curve Digital Signature Algorithm (ECDSA).
   """
 
-  alias Tezex.Crypto.{
-    Curve,
-    KnownCurves,
-    Math,
-    Point,
-    PublicKey,
-    Signature,
-    Utils
-  }
+  import Bitwise
+
+  alias Tezex.Crypto.Curve
+  alias Tezex.Crypto.HMACDRBG
+  alias Tezex.Crypto.KnownCurves
+  alias Tezex.Crypto.Math
+  alias Tezex.Crypto.Point
+  alias Tezex.Crypto.PrivateKey
+  alias Tezex.Crypto.PublicKey
+  alias Tezex.Crypto.Signature
+  alias Tezex.Crypto.Utils
 
   @doc """
   Decodes a compressed public key to the EC public key it is representing on EC `curve`.
@@ -173,5 +175,55 @@ defmodule Tezex.Crypto.ECDSA do
       Utils.mod(v.x, curve_data."N") != signature.r -> false
       true -> true
     end
+  end
+
+  @spec sign(iodata(), PrivateKey.t(), list(any())) :: Signature.t()
+  @spec sign(iodata(), PrivateKey.t()) :: Signature.t()
+  def sign(message, private_key, options \\ []) do
+    %{hashfunc: hashfunc} =
+      Enum.into(options, %{hashfunc: fn msg -> :crypto.hash(:sha256, msg) end})
+
+    curve_data = private_key.curve
+
+    message = hashfunc.(message)
+    number_message = Utils.number_from_string(message)
+
+    ns1 = :binary.encode_unsigned(curve_data."N" - 1)
+    nh = curve_data."N" >>> 1
+
+    drbg = HMACDRBG.new(private_key.secret, message)
+
+    message = Utils.truncate_to_n(number_message, curve_data."N")
+
+    Enum.reduce_while(1..1_000_000, drbg, fn _, drbg ->
+      {k, drbg} = HMACDRBG.generate(drbg)
+
+      k =
+        k
+        |> :binary.decode_unsigned()
+        |> Utils.truncate_to_n(curve_data."N", true)
+
+      with true <- not (k <= 1 or k >= ns1),
+           kp = Math.multiply(curve_data."G", k, curve_data."N", curve_data."A", curve_data."P"),
+           false <- Point.is_at_infinity?(kp),
+           r <- rem(kp.x, curve_data."N"),
+           true <- r != 0,
+           s =
+             Math.inv(k, curve_data."N") *
+               (r * :binary.decode_unsigned(private_key.secret) + message),
+           s = rem(s, curve_data."N"),
+           true <- s != 0 do
+        s =
+          if s > nh do
+            curve_data."N" - s
+          else
+            s
+          end
+
+        {:halt, %Signature{r: r, s: s}}
+      else
+        _ -> {:continue, drbg}
+      end
+    end)
   end
 end
