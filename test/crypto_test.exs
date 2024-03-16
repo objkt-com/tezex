@@ -310,8 +310,8 @@ defmodule Tezex.Crypto.Test do
     #     "sigZiUh7khZmjP1kGSSNe3LQdZC5GMpWHuyFkqcR37pwiGUJrpKaatUxWcRPBE5sHwqfydUsPM4JvK14dBMoHbCxC7VHdMZC"
 
     #   assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
-    #   assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
-    #   assert signature == Crypto.sign(secret_key, bytes, watermark)
+    #   assert signature == Crypto.sign({encoded_private_key, passphrase}, bytes, watermark)
+    #   assert signature == Crypto.sign({secret_key, passphrase}, bytes, watermark)
     # end
 
     # test "Tz3 Encrypted with bytes producing signature that needs padding" do

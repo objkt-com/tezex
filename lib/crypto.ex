@@ -204,35 +204,44 @@ defmodule Tezex.Crypto do
     end
   end
 
-  defp decode_privkey(key, passphrase \\ nil) do
-    if binary_part(key, 2, 1) == "e" and is_nil(passphrase) do
+  defp decode_privkey({privkey, passphrase}) do
+    decode_privkey(privkey, passphrase)
+  end
+
+  defp decode_privkey(privkey, passphrase \\ nil) do
+    if binary_part(privkey, 2, 1) == "e" and is_nil(passphrase) do
       throw("missing passphrase")
     end
 
     prefix =
-      case key do
+      case privkey do
         "edsk" <> _ -> @prefix_edsk
+        "edes" <> _ -> @prefix_edsk
         "spsk" <> _ -> @prefix_spsk
+        "spes" <> _ -> @prefix_spsk
         "p2sk" <> _ -> @prefix_p2sk
+        "p2es" <> _ -> @prefix_p2sk
       end
 
-    key = Base58Check.decode58!(key)
+    decoded_privkey =
+      Base58Check.decode58!(privkey)
+      |> binary_part(byte_size(prefix), 32)
+      |> Utils.pad(32, :leading)
 
-    binary_part(key, byte_size(prefix), 32)
-    |> Utils.pad(32, :leading)
+    {privkey, decoded_privkey}
   end
 
-  def sign(secret_key, bytes, watermark \\ <<>>) do
+  def sign(privkey_param, bytes, watermark \\ <<>>) do
     msg = :binary.decode_hex(bytes)
-    decoded_key = decode_privkey(secret_key)
+    {privkey, decoded_key} = decode_privkey(privkey_param)
 
-    case secret_key do
-      "edsk" <> _ ->
+    case privkey do
+      "ed" <> _ ->
         bytes_hash = Blake2.hash2b(watermark <> msg, 32)
         signature = :crypto.sign(:eddsa, :none, bytes_hash, [decoded_key, :ed25519])
         Base58Check.encode(signature, @prefix_sig)
 
-      "spsk" <> _ ->
+      "sp" <> _ ->
         pk = %PrivateKey{secret: decoded_key, curve: KnownCurves.secp256k1()}
         s = ECDSA.sign(watermark <> msg, pk, hashfunc: fn msg -> Blake2.hash2b(msg, 32) end)
 
@@ -246,7 +255,7 @@ defmodule Tezex.Crypto do
 
         Base58Check.encode(signature, @prefix_sig)
 
-      "p2sk" <> _ ->
+      "p2" <> _ ->
         pk = %PrivateKey{secret: decoded_key, curve: KnownCurves.prime256v1()}
         s = ECDSA.sign(watermark <> msg, pk, hashfunc: fn msg -> Blake2.hash2b(msg, 32) end)
 
