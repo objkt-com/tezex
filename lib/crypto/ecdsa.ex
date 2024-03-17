@@ -197,7 +197,7 @@ defmodule Tezex.Crypto.ECDSA do
     message = Utils.truncate_to_n(number_message, curve_data."N")
 
     Enum.reduce_while(1..1_000_000, drbg, fn _, drbg ->
-      {k, drbg} = HMACDRBG.generate(drbg)
+      {k, drbg} = HMACDRBG.generate(drbg, 32)
 
       k =
         k

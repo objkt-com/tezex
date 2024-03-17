@@ -18,70 +18,36 @@ defmodule Tezex.Crypto.HMACDRBG do
   defstruct k: <<>>, v: <<>>, count: 0
 
   @spec init(iodata(), iodata()) :: t()
-  @spec init(iodata(), iodata(), iodata()) :: t()
-  def init(entropy, nonce, pers \\ <<>>) do
+  @spec init(iodata(), iodata(), iodata() | nil) :: t()
+  def init(entropy, nonce, pers \\ nil) do
     k = for _ <- 1..32, into: <<>>, do: <<0>>
     v = for _ <- 1..32, into: <<>>, do: <<1>>
     state = %__MODULE__{k: k, v: v, count: 0}
 
-    state = update(state, [entropy, nonce, pers])
+    seed =
+      [entropy, nonce, pers]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.join()
+      |> :binary.encode_hex()
+
+    state = update(state, seed)
     %{state | count: 1}
   end
 
-  @spec count(t()) :: non_neg_integer()
-  def count(state), do: state.count
-
-  @spec reseed(t(), iodata()) :: t()
-  @spec reseed(t(), iodata(), iodata()) :: t()
-  def reseed(state, entropy, add \\ <<>>) do
-    update(state, [entropy, add])
-  end
-
-  @spec generate(t()) :: {binary(), t()}
-  @spec generate(t(), iodata()) :: {binary(), t()}
-  def generate(state, add \\ <<>>) do
-    result = for _ <- 1..32, into: <<>>, do: <<0>>
-    generate_to_slice(state, result, add)
-  end
-
-  @spec generate_to_slice(t(), iodata(), iodata()) :: {binary(), t()}
-  def generate_to_slice(state, result, add) do
-    result = generate_bytes(state, result)
-
-    case add do
-      <<>> -> update(state, nil)
-      _ -> update(state, [add])
-    end
-
-    {result, %{state | count: state.count + 1}}
-  end
-
-  @spec generate(t()) :: binary()
-  defp generate_bytes(state, result) do
-    Enum.reduce_while(1..10000, {0, state.v, result}, fn _, {i, v, result} ->
-      if i < byte_size(result) do
-        vmac = hmac(state.k)
-        vmac = :crypto.mac_update(vmac, v)
-        vmac = :crypto.mac_final(vmac)
-        <<ex::binary-size(i), _::binary>> = result
-        {:cont, {i + byte_size(vmac), v, ex <> vmac}}
-      else
-        {:halt, result}
-      end
-    end)
-  end
-
-  @spec generate(t(), list(binary())) :: t()
-  defp update(state, seeds) do
-    kmac = hmac(state.k)
-    kmac = :crypto.mac_update(kmac, state.v)
-    kmac = :crypto.mac_update(kmac, <<0>>)
+  @spec update(t(), binary | nil) :: t()
+  defp update(state, seed) do
+    seed = if is_nil(seed), do: nil, else: :binary.decode_hex(seed)
 
     kmac =
-      if is_nil(seeds) do
+      hmac(state.k)
+      |> :crypto.mac_update(state.v)
+      |> :crypto.mac_update(<<0>>)
+
+    kmac =
+      if is_nil(seed) do
         kmac
       else
-        Enum.reduce(seeds, kmac, &:crypto.mac_update(&2, &1))
+        :crypto.mac_update(kmac, seed)
       end
 
     k = :crypto.mac_final(kmac)
@@ -91,7 +57,7 @@ defmodule Tezex.Crypto.HMACDRBG do
       |> :crypto.mac_update(state.v)
       |> :crypto.mac_final()
 
-    if is_nil(seeds) do
+    if is_nil(seed) do
       %{state | k: k, v: v}
     else
       kmac =
@@ -99,17 +65,60 @@ defmodule Tezex.Crypto.HMACDRBG do
         |> :crypto.mac_update(v)
         |> :crypto.mac_update(<<1>>)
 
-      kmac = Enum.reduce(seeds, kmac, &:crypto.mac_update(&2, &1))
+      kmac = :crypto.mac_update(kmac, seed)
 
       k = :crypto.mac_final(kmac)
 
-      v =
-        hmac(k)
-        |> :crypto.mac_update(v)
-        |> :crypto.mac_final()
+      v = hmac(k) |> :crypto.mac_update(v) |> :crypto.mac_final()
 
+      # d("#{source} update with", seed)
+      # d(v)
       %{state | k: k, v: v}
     end
+  end
+
+  @spec reseed(t(), iodata()) :: t()
+  @spec reseed(t(), iodata(), iodata() | nil) :: t()
+  def reseed(state, entropy, add \\ nil) do
+    seed =
+      [entropy, add]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.join("")
+      |> :binary.encode_hex()
+
+    update(state, seed)
+  end
+
+  @spec generate(t(), pos_integer()) :: {binary(), t()}
+  @spec generate(t(), pos_integer(), iodata() | nil) :: {binary(), t()}
+  def generate(state, size, add \\ nil) do
+    state =
+      case add do
+        nil -> state
+        _ -> update(state, add)
+      end
+
+    {v, result} = generate_bytes(state, size)
+    state = %{state | v: v}
+
+    state = update(state, add)
+
+    {result, %{state | count: state.count + 1}}
+  end
+
+  defp generate_bytes(state, size) do
+    Enum.reduce_while(1..10000, {state.v, <<>>}, fn _i, {v, result} ->
+      if byte_size(result) < size / 2 do
+        v =
+          hmac(state.k)
+          |> :crypto.mac_update(v)
+          |> :crypto.mac_final()
+
+        {:cont, {v, result <> v}}
+      else
+        {:halt, {v, result}}
+      end
+    end)
   end
 
   defp hmac(k) do

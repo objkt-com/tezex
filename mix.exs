@@ -68,6 +68,7 @@ defmodule Tezex.MixProject do
       {:ex_doc, "~> 0.27", only: :dev, runtime: false},
       {:ex_unit_notifier, "~> 1.2", only: :test},
       {:excoveralls, "~> 0.15.1", only: :test},
+      {:jason, "~> 1.4", only: :test},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:ssl_verify_fun, "~> 1.1", manager: :rebar3, override: true}
     ]
