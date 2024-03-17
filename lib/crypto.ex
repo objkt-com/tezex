@@ -3,12 +3,13 @@ defmodule Tezex.Crypto do
   A set of functions to check Tezos signed messages, derive a pkh from a pubkey, verify that a public key corresponds to a wallet address (public key hash).
   """
 
-  alias Tezex.Crypto.KnownCurves
   alias Tezex.Crypto.Base58Check
   alias Tezex.Crypto.ECDSA
+  alias Tezex.Crypto.KnownCurves
   alias Tezex.Crypto.PrivateKey
   alias Tezex.Crypto.Signature
   alias Tezex.Crypto.Utils
+  alias Tezex.Micheline
 
   # public key
   @prefix_edpk <<13, 15, 37, 217>>
@@ -239,7 +240,7 @@ defmodule Tezex.Crypto do
   end
 
   @doc """
-  Sign an operation using 0x03 as watermark
+  Sign an operation using `0x03` as watermark
   """
   @spec sign_operation(privkey_param(), binary()) :: nonempty_binary()
   def sign_operation(privkey_param, bytes) do
@@ -247,7 +248,7 @@ defmodule Tezex.Crypto do
   end
 
   @doc """
-  Sign the hexadecimal/Micheline representation of a string
+  Sign the hexadecimal/Micheline representation of a string, Micheline encoding is done when `bytes` do not start with `"0501"`.
   """
   @spec sign_message(privkey_param(), binary()) :: nonempty_binary()
   def sign_message(privkey_param, "0501" <> _ = bytes) do
@@ -255,21 +256,7 @@ defmodule Tezex.Crypto do
   end
 
   def sign_message(privkey_param, bytes) do
-    sign(privkey_param, encode_message(bytes))
-  end
-
-  @doc """
-  Encode a string to its Micheline representation:
-  * "05" to indicate that it is a Micheline expression
-  * "01" to indicate that it is a Micheline string
-  * byte size encoded on 4 bytes
-  * hex representation of the string
-  """
-  def encode_message(bytes) do
-    hex_bytes = :binary.encode_hex(bytes)
-    padded_bytes_size = String.pad_leading("#{trunc(byte_size(hex_bytes) / 2)}", 8, "0")
-
-    "0501" <> padded_bytes_size <> hex_bytes
+    sign(privkey_param, Micheline.string_to_micheline_hex(bytes))
   end
 
   @spec sign(privkey_param(), binary(), binary()) :: nonempty_binary()

@@ -3,6 +3,7 @@ defmodule Tezex.Crypto.Test do
   doctest Tezex.Crypto
 
   alias Tezex.Crypto
+  alias Tezex.Micheline
 
   describe "check_signature/4" do
     @msg_sig_pubkey [
@@ -357,7 +358,7 @@ defmodule Tezex.Crypto.Test do
 
   defp sign_and_verify(encoded_private_key, pubkey) do
     msg = "aaøfË"
-    msg = Crypto.encode_message(msg)
+    msg = Micheline.string_to_micheline_hex(msg)
 
     signature = Crypto.sign_message(encoded_private_key, msg)
     Crypto.verify_signature(signature, msg, pubkey)

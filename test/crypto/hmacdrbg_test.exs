@@ -48,8 +48,6 @@ defmodule Tezex.Crypto.HMACDRBG.Test do
   describe "NIST" do
     @fixtures Jason.decode!(File.read!("./test/fixtures/hmac-drbg-nist.json"))
 
-    # fixtures = [List.first(@fixtures)]
-
     for t <- @fixtures do
       test "vector #{t["name"]}" do
         entropy = :binary.decode_hex(unquote(t["entropy"]))

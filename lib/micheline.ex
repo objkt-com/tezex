@@ -30,7 +30,7 @@ defmodule Tezex.Micheline do
       iex> Tezex.Micheline.read_packed("0200e1d22c")
       %{int: -365_729}
   """
-  @spec read_packed(binary) :: map | list(map)
+  @spec read_packed(binary()) :: map() | list(map())
   def read_packed(<<_::binary-size(2), rest::binary>>) do
     {val, _consumed} = hex_to_micheline(rest)
     val
@@ -47,7 +47,7 @@ defmodule Tezex.Micheline do
       iex> Tezex.Micheline.hex_to_micheline("00e1d22c")
       {%{int: -365729}, 8}
   """
-  @spec hex_to_micheline(binary) :: {map | list(map), pos_integer}
+  @spec hex_to_micheline(binary()) :: {map() | list(map()), pos_integer()}
   # literal int or nat
   def hex_to_micheline("00" <> rest) do
     {result, consumed} = Zarith.consume(rest)
@@ -211,6 +211,21 @@ defmodule Tezex.Micheline do
   end
 
   @doc """
+  Encode a string to its Micheline representation:
+  * `"05"` to indicate that it is a Micheline expression
+  * `"01"` to indicate that it is a Micheline string
+  * byte size encoded on 4 bytes
+  * hex representation of the string
+  """
+  @spec string_to_micheline_hex(binary()) :: binary()
+  def string_to_micheline_hex(bytes) do
+    hex_bytes = :binary.encode_hex(bytes)
+    padded_bytes_size = String.pad_leading("#{trunc(byte_size(hex_bytes) / 2)}", 8, "0")
+
+    "0501" <> padded_bytes_size <> hex_bytes
+  end
+
+  @doc """
   Decode optimized Micheline representation of an address value
 
   ## Examples
@@ -219,7 +234,7 @@ defmodule Tezex.Micheline do
       iex> Tezex.Micheline.decode_optimized_address("10007fc95c97fd368cd9055610ee79e64ff9e0b5285c")
       {:error, :invalid}
   """
-  @spec decode_optimized_address(<<_::_*16>>) :: {:error, :invalid} | {:ok, nonempty_binary()}
+  @spec decode_optimized_address(binary()) :: {:error, :invalid} | {:ok, nonempty_binary()}
   def decode_optimized_address(hex) do
     {prefix, pkh} =
       case :binary.decode_hex(hex) do
