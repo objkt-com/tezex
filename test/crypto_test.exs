@@ -105,6 +105,19 @@ defmodule Tezex.Crypto.Test do
       end
     end
 
+    test "verifies valid signature with generic prefix" do
+      message =
+        "03d0c10e3ed11d7c6e3357f6ef335bab9e8f2bd54d0ce20c482e241191a6e4b8ce6c01be917311d9ac46959750e405d57e268e2ed9e174a80794fbd504e12a4a000141eb3781afed2f69679ff2bbe1c5375950b0e40d00ff000000005e05050505050507070100000024747a32526773486e74516b72794670707352466261313652546656503539684b72654a4d07070100000024747a315a6672455263414c42776d4171776f6e525859565142445439426a4e6a42484a750001"
+
+      pk = "sppk7c7hkPj47yjYFEHX85q46sFJGw6RBrqoVSHwAJAT4e14KJwzoey"
+      pkh = "tz2RgsHntQkryFppsRFba16RTfVP59hKreJM"
+
+      sig =
+        "sigtofRkQAsLW8ne1HcGhbuBg2Ja2Yt9A2gfpwZFBsdjRWLPSVVqN9BVRpGr7DMwz1e4WjyF8iAjpf1LKyZMcJTSPrDaRzsx"
+
+      assert :ok = Crypto.check_signature(pkh, sig, message, pk)
+    end
+
     test "does not verify invalid signatures" do
       # modify one character in the valid signed message to make it invalid
       for {params, idx} <- Enum.with_index(@msg_sig_pubkey, 1) do

@@ -23,8 +23,10 @@ defmodule Tezex.Crypto do
   @prefix_spsk <<17, 162, 224, 201>>
   @prefix_p2sk <<16, 81, 238, 189>>
   # sig
-  @prefix_sig <<4, 130, 43>>
+  @prefix_edsig <<9, 245, 205, 134, 18>>
+  @prefix_spsig <<13, 115, 101, 19, 63>>
   @prefix_p2sig <<54, 240, 44, 52>>
+  @prefix_sig <<4, 130, 43>>
 
   @doc """
   Verify that `address` is the public key hash of `pubkey` and that `signature` is a valid signature for `message` signed with the private key corresponding to public key `pubkey`.
@@ -42,13 +44,15 @@ defmodule Tezex.Crypto do
       iex> Tezex.Crypto.check_signature(address, signature, "", public_key)
       {:error, :bad_signature}
       iex> Tezex.Crypto.check_signature(address, "x" <> signature, "", public_key)
-      {:error, :invalid_pubkey_format}
+      {:error, :invalid_signature}
   """
   @spec check_signature(binary, binary, binary, binary) ::
           :ok | {:error, :address_mismatch | :invalid_pubkey_format | :bad_signature}
 
   def check_signature("tz" <> _ = address, signature, message, pubkey) do
     with :ok <- check_address(address, pubkey),
+         {:ok, _} <- extract_pubkey(pubkey),
+         {:ok, _} <- decode_signature(signature),
          true <- verify_signature(signature, message, pubkey) do
       :ok
     else
@@ -57,48 +61,52 @@ defmodule Tezex.Crypto do
     end
   end
 
+  defp extract_pubkey(pubkey) do
+    case Base58Check.decode58(pubkey) do
+      {:ok, <<@prefix_edpk, public_key::binary-size(32)>> <> _} -> {:ok, public_key}
+      {:ok, <<@prefix_sppk, public_key::binary-size(33)>> <> _} -> {:ok, public_key}
+      {:ok, <<@prefix_p2pk, public_key::binary-size(33)>> <> _} -> {:ok, public_key}
+      _ -> {:error, :invalid_pubkey_format}
+    end
+  end
+
   @doc """
   Verify that `signature` is a valid signature for `message` signed with the private key corresponding to public key `pubkey`
   """
   @spec verify_signature(binary, binary, binary) :: boolean
-  def verify_signature("ed" <> _ = signature, message, pubkey) do
+  def verify_signature(signature, message, "ed" <> _ = pubkey) do
     # tz1…
     message_hash = hash_message(message)
-    signature = decode_signature(signature)
-
-    # <<0x0D, 0x0F, 0x25, 0xD9>>
-    <<@prefix_edpk, public_key::binary-size(32)>> <> _ = Base58Check.decode58!(pubkey)
+    {:ok, signature} = decode_signature(signature)
+    {:ok, public_key} = extract_pubkey(pubkey)
 
     :crypto.verify(:eddsa, :none, message_hash, signature, [public_key, :ed25519])
   end
 
-  def verify_signature("sp" <> _ = signature, msg, pubkey) do
+  def verify_signature(signature, msg, "sp" <> _ = pubkey) do
     # tz2…
-    <<r::unsigned-integer-size(256), s::unsigned-integer-size(256)>> = decode_signature(signature)
+    {:ok, <<r::unsigned-integer-size(256), s::unsigned-integer-size(256)>>} =
+      decode_signature(signature)
+
     signature = %Signature{r: r, s: s}
 
     message = :binary.decode_hex(msg)
 
-    # <<0x03, 0xFE, 0xE2, 0x56>>
-    <<@prefix_sppk, public_key::binary-size(33)>> <> _ = Base58Check.decode58!(pubkey)
-
+    {:ok, public_key} = extract_pubkey(pubkey)
     public_key = ECDSA.decode_public_key(public_key, :secp256k1)
 
     ECDSA.verify?(message, signature, public_key, hashfunc: fn msg -> Blake2.hash2b(msg, 32) end)
   end
 
-  def verify_signature("p2" <> _ = signature, msg, pubkey) do
+  def verify_signature(signature, msg, "p2" <> _ = pubkey) do
     # tz3…
-    <<@prefix_p2sig, sig::binary-size(64)>> <> _ = Base58Check.decode58!(signature)
+    message = :binary.decode_hex(msg)
+    {:ok, sig} = decode_signature(signature)
 
     <<r::unsigned-integer-size(256), s::unsigned-integer-size(256)>> = sig
     signature = %Signature{r: r, s: s}
 
-    message = :binary.decode_hex(msg)
-
-    # <<0x03, 0xB2, 0x8B, 0x7F>>
-    <<@prefix_p2pk, public_key::binary-size(33)>> <> _ = Base58Check.decode58!(pubkey)
-
+    {:ok, public_key} = extract_pubkey(pubkey)
     public_key = ECDSA.decode_public_key(public_key, :prime256v1)
 
     ECDSA.verify?(message, signature, public_key, hashfunc: fn msg -> Blake2.hash2b(msg, 32) end)
@@ -271,10 +279,37 @@ defmodule Tezex.Crypto do
     end
   end
 
-  defp decode_signature(data) do
-    data
-    |> Base58Check.decode58!()
-    |> binary_part(5, 64)
+  @spec decode_signature(binary()) :: {:error, :invalid_signature} | {:ok, binary()}
+  defp decode_signature("edsig" <> _ = sig) do
+    case Base58Check.decode58(sig) do
+      {:ok, <<@prefix_edsig, sig::binary-size(64)>> <> _} -> {:ok, sig}
+      _ -> {:error, :invalid_signature}
+    end
+  end
+
+  defp decode_signature("spsig" <> _ = sig) do
+    case Base58Check.decode58(sig) do
+      {:ok, <<@prefix_spsig, sig::binary-size(64)>> <> _} -> {:ok, sig}
+      _ -> {:error, :invalid_signature}
+    end
+  end
+
+  defp decode_signature("p2sig" <> _ = sig) do
+    case Base58Check.decode58(sig) do
+      {:ok, <<@prefix_p2sig, sig::binary-size(64)>> <> _} -> {:ok, sig}
+      _ -> {:error, :invalid_signature}
+    end
+  end
+
+  defp decode_signature("sig" <> _ = sig) do
+    case Base58Check.decode58(sig) do
+      {:ok, <<@prefix_sig, sig::binary-size(64)>> <> _} -> {:ok, sig}
+      _ -> {:error, :invalid_signature}
+    end
+  end
+
+  defp decode_signature(_) do
+    {:error, :invalid_signature}
   end
 
   defp hash_message(message) do
