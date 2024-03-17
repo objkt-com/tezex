@@ -136,6 +136,7 @@ defmodule Tezex.Crypto.ECDSA do
   - verified [`bool`]: true if message, public key and signature are compatible, false otherwise
   """
   @spec verify?(nonempty_binary, Signature.t(), PublicKey.t(), list) :: boolean
+  @spec verify?(nonempty_binary, Signature.t(), PublicKey.t()) :: boolean
   def verify?(message, signature, public_key, options \\ []) do
     %{hashfunc: hashfunc} =
       Enum.into(options, %{hashfunc: fn msg -> :crypto.hash(:sha256, msg) end})

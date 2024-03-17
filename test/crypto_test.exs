@@ -1,6 +1,7 @@
 defmodule Tezex.Crypto.Test do
   use ExUnit.Case, async: true
   doctest Tezex.Crypto
+
   alias Tezex.Crypto
 
   describe "check_signature/4" do
@@ -241,6 +242,8 @@ defmodule Tezex.Crypto.Test do
 
       assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
       assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
+
+      assert true == sign_and_verify(encoded_private_key, pubkey)
     end
 
     test "Tz1 32 bytes" do
@@ -260,6 +263,9 @@ defmodule Tezex.Crypto.Test do
       assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
       assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
       assert signature == Crypto.sign(secret_key, bytes, watermark)
+
+      assert true == sign_and_verify(encoded_private_key, pubkey)
+      assert true == sign_and_verify(secret_key, pubkey)
     end
 
     test "Tz2" do
@@ -275,6 +281,8 @@ defmodule Tezex.Crypto.Test do
 
       assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
       assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
+
+      assert true == sign_and_verify(encoded_private_key, pubkey)
     end
 
     test "Tz2 having 'y' coordinate shorter than 32 bytes" do
@@ -290,6 +298,8 @@ defmodule Tezex.Crypto.Test do
 
       assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
       assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
+
+      assert true == sign_and_verify(encoded_private_key, pubkey)
     end
 
     test "Tz3" do
@@ -305,6 +315,8 @@ defmodule Tezex.Crypto.Test do
 
       assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
       assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
+
+      assert true == sign_and_verify(encoded_private_key, pubkey)
     end
 
     # test "Tz3 Encrypted" do
@@ -341,6 +353,14 @@ defmodule Tezex.Crypto.Test do
     #   assert signature == Crypto.sign(encoded_private_key, bytes)
     #   assert signature == Crypto.sign(secret_key, bytes)
     # end
+  end
+
+  defp sign_and_verify(encoded_private_key, pubkey) do
+    msg = "aaøfË"
+    msg = Crypto.encode_message(msg)
+
+    signature = Crypto.sign_message(encoded_private_key, msg)
+    Crypto.verify_signature(signature, msg, pubkey)
   end
 
   defp replace_nth_character(input, n \\ 20) do

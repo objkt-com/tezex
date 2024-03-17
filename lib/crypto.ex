@@ -28,6 +28,8 @@ defmodule Tezex.Crypto do
   @prefix_p2sig <<54, 240, 44, 52>>
   @prefix_sig <<4, 130, 43>>
 
+  @type privkey_param :: binary() | {privkey :: binary(), passphrase :: binary()}
+
   @doc """
   Verify that `address` is the public key hash of `pubkey` and that `signature` is a valid signature for `message` signed with the private key corresponding to public key `pubkey`.
 
@@ -47,7 +49,9 @@ defmodule Tezex.Crypto do
       {:error, :invalid_signature}
   """
   @spec check_signature(binary, binary, binary, binary) ::
-          :ok | {:error, :address_mismatch | :invalid_pubkey_format | :bad_signature}
+          :ok
+          | {:error,
+             :address_mismatch | :invalid_pubkey_format | :invalid_signature | :bad_signature}
 
   def check_signature("tz" <> _ = address, signature, message, pubkey) do
     with :ok <- check_address(address, pubkey),
@@ -85,12 +89,12 @@ defmodule Tezex.Crypto do
 
   def verify_signature(signature, msg, "sp" <> _ = pubkey) do
     # tz2…
+    message = :binary.decode_hex(msg)
+
     {:ok, <<r::unsigned-integer-size(256), s::unsigned-integer-size(256)>>} =
       decode_signature(signature)
 
     signature = %Signature{r: r, s: s}
-
-    message = :binary.decode_hex(msg)
 
     {:ok, public_key} = extract_pubkey(pubkey)
     public_key = ECDSA.decode_public_key(public_key, :secp256k1)
@@ -132,14 +136,9 @@ defmodule Tezex.Crypto do
           :ok | {:error, :address_mismatch | :invalid_pubkey_format}
   def check_address(address, pubkey) do
     case derive_address(pubkey) do
-      {:ok, ^address} ->
-        :ok
-
-      {:ok, _derived} ->
-        {:error, :address_mismatch}
-
-      err ->
-        err
+      {:ok, ^address} -> :ok
+      {:ok, _derived} -> {:error, :address_mismatch}
+      err -> err
     end
   end
 
@@ -239,6 +238,42 @@ defmodule Tezex.Crypto do
     {privkey, decoded_privkey}
   end
 
+  @doc """
+  Sign an operation using 0x03 as watermark
+  """
+  @spec sign_operation(privkey_param(), binary()) :: nonempty_binary()
+  def sign_operation(privkey_param, bytes) do
+    sign(privkey_param, bytes, <<3>>)
+  end
+
+  @doc """
+  Sign the hexadecimal/Micheline representation of a string
+  """
+  @spec sign_message(privkey_param(), binary()) :: nonempty_binary()
+  def sign_message(privkey_param, "0501" <> _ = bytes) do
+    sign(privkey_param, bytes)
+  end
+
+  def sign_message(privkey_param, bytes) do
+    sign(privkey_param, encode_message(bytes))
+  end
+
+  @doc """
+  Encode a string to its Micheline representation:
+  * "05" to indicate that it is a Micheline expression
+  * "01" to indicate that it is a Micheline string
+  * byte size encoded on 4 bytes
+  * hex representation of the string
+  """
+  def encode_message(bytes) do
+    hex_bytes = :binary.encode_hex(bytes)
+    padded_bytes_size = String.pad_leading("#{trunc(byte_size(hex_bytes) / 2)}", 8, "0")
+
+    "0501" <> padded_bytes_size <> hex_bytes
+  end
+
+  @spec sign(privkey_param(), binary(), binary()) :: nonempty_binary()
+  @spec sign(privkey_param(), binary()) :: nonempty_binary()
   def sign(privkey_param, bytes, watermark \\ <<>>) do
     msg = :binary.decode_hex(bytes)
     {privkey, decoded_key} = decode_privkey(privkey_param)

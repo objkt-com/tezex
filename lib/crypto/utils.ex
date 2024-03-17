@@ -41,10 +41,10 @@ defmodule Tezex.Crypto.Utils do
     parsed_int
   end
 
+  @spec string_from_number(integer(), non_neg_integer()) :: binary()
   def string_from_number(number, string_length) do
     number
     |> Integer.to_string(16)
-    # pad start
     |> fill_number_string(string_length)
     |> Base.decode16!()
   end
@@ -53,17 +53,11 @@ defmodule Tezex.Crypto.Utils do
     String.duplicate("0", 2 * string_length - byte_size(string)) <> string
   end
 
-  if Mix.env() == :test do
-    # we want deterministic tests
-    def rand_fun(bytes_needed) do
-      for _ <- 1..bytes_needed, into: <<>>, do: Integer.to_string(Enum.random(0..15), 16)
-    end
-  else
-    def rand_fun(bytes_needed) do
-      :crypto.strong_rand_bytes(bytes_needed)
-    end
+  def rand_fun(bytes_needed) do
+    :crypto.strong_rand_bytes(bytes_needed)
   end
 
+  @spec between(number(), number()) :: number()
   def between(minimum, maximum) when minimum < maximum do
     range = maximum - minimum + 1
     {bytes_needed, mask} = calculate_parameters(range)
