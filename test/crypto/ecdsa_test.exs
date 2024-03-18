@@ -1,4 +1,4 @@
-defmodule Tezex.Crypto.ECDSA.Test do
+defmodule Tezex.Crypto.ECDSATest do
   use ExUnit.Case
 
   alias Tezex.Crypto.ECDSA

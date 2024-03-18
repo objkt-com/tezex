@@ -78,7 +78,7 @@ defmodule Tezex.Crypto do
   @doc """
   Verify that `signature` is a valid signature for `message` signed with the private key corresponding to public key `pubkey`
   """
-  @spec verify_signature(binary, binary, binary) :: boolean
+  @spec verify_signature(binary, binary, binary) :: boolean()
   def verify_signature(signature, message, "ed" <> _ = pubkey) do
     # tz1…
     message_hash = hash_message(message)
@@ -213,6 +213,7 @@ defmodule Tezex.Crypto do
   end
 
   defp decode_privkey({privkey, passphrase}) do
+    throw("not implemented")
     decode_privkey(privkey, passphrase)
   end
 
@@ -249,6 +250,15 @@ defmodule Tezex.Crypto do
 
   @doc """
   Sign the hexadecimal/Micheline representation of a string, Micheline encoding is done when `bytes` do not start with `"0501"`.
+
+  ## Examples
+      iex> encoded_private_key = "spsk24EJohZHJkZnWEzj3w9wE7BFARpFmq5WAo9oTtqjdJ2t4pyoB3"
+      iex> Tezex.Crypto.sign_message(encoded_private_key, "foo")
+      "sigm9uJiGjdk2DpuqTmHcjzpAdTSQfqKxFuDKodyNT8JP3UvrfoPFTNkFbFgDP1WfAi2PjJ3dcpZFLTagD7gUBmwVWbPr5mk"
+      iex> msg = Tezex.Micheline.string_to_micheline_hex("foo")
+      "050100000003666F6F"
+      iex> Tezex.Crypto.sign_message(encoded_private_key, msg)
+      "sigm9uJiGjdk2DpuqTmHcjzpAdTSQfqKxFuDKodyNT8JP3UvrfoPFTNkFbFgDP1WfAi2PjJ3dcpZFLTagD7gUBmwVWbPr5mk"
   """
   @spec sign_message(privkey_param(), binary()) :: nonempty_binary()
   def sign_message(privkey_param, "0501" <> _ = bytes) do

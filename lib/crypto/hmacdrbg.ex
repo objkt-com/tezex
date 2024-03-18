@@ -19,8 +19,11 @@ defmodule Tezex.Crypto.HMACDRBG do
   Implementation inspired by both:
 
   > https://github.com/indutny/hmac-drbg/blob/master/package.json
+  >
   > MIT / (c) Fedor Indutny <fedor@indutny.com>
+
   > https://github.com/sorpaas/rust-hmac-drbg/blob/master/src/lib.rs
+  >
   > Apache License, Version 2.0, January 2004 / Copyright {yyyy} {name of copyright owner}
   """
 
@@ -132,26 +135,23 @@ defmodule Tezex.Crypto.HMACDRBG do
         _ -> update(state, add)
       end
 
-    {v, result} = generate_bytes(state, size)
-    state = %{state | v: v}
+    {state, result} = generate_bytes(state, size, <<>>)
 
     state = update(state, add)
 
     {result, %{state | count: state.count + 1}}
   end
 
-  defp generate_bytes(state, size) do
-    Enum.reduce_while(1..10000, {state.v, <<>>}, fn _i, {v, result} ->
-      if byte_size(result) < size / 2 do
-        v =
-          :crypto.mac_init(:hmac, state.algo, state.k)
-          |> :crypto.mac_update(v)
-          |> :crypto.mac_final()
+  defp generate_bytes(state, size, result) when byte_size(result) < size / 2 do
+    v =
+      :crypto.mac_init(:hmac, state.algo, state.k)
+      |> :crypto.mac_update(state.v)
+      |> :crypto.mac_final()
 
-        {:cont, {v, result <> v}}
-      else
-        {:halt, {v, result}}
-      end
-    end)
+    generate_bytes(%{state | v: v}, size, result <> v)
+  end
+
+  defp generate_bytes(state, _size, result) do
+    {state, result}
   end
 end

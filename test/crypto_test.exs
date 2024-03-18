@@ -1,4 +1,4 @@
-defmodule Tezex.Crypto.Test do
+defmodule Tezex.CryptoTest do
   use ExUnit.Case, async: true
   doctest Tezex.Crypto
 

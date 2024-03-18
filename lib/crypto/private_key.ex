@@ -1,18 +1,23 @@
 defmodule Tezex.Crypto.PrivateKey do
   @moduledoc """
-  Used to create private keys or convert them between struct and .der or .pem formats. Also allows creations of public keys from private keys.
+  Holds private key data.
+
+  Used to create private keys and created public keys from private keys.
+
+  Parameters:
+  - `:secret` [`t:binary/0`]: public key point data;
+  - `:curve` [`t:Tezex.Crypto.Curve.t/0`]: public key curve information.
   """
 
   alias Tezex.Crypto.Curve
   alias Tezex.Crypto.KnownCurves
   alias Tezex.Crypto.Math
-  alias Tezex.Crypto.Point
   alias Tezex.Crypto.PrivateKey
   alias Tezex.Crypto.PublicKey
   alias Tezex.Crypto.Utils
 
   @type t :: %__MODULE__{
-          secret: any(),
+          secret: binary(),
           curve: Curve.t()
         }
 
@@ -20,8 +25,8 @@ defmodule Tezex.Crypto.PrivateKey do
   Holds private key data.
 
   Parameters:
-  - `:secret` [integer]: private key secret number
-  - `:curve` [%Tezex.Crypto.Curve]: private key curve information
+  - `:secret` [`t:binary/0`]: private key secret number as bytes
+  - `:curve` [`t:Tezex.Crypto.Curve.t/0`]: private key curve information
   """
   defstruct [:secret, :curve]
 
@@ -29,27 +34,33 @@ defmodule Tezex.Crypto.PrivateKey do
   Creates a new private key
 
   Parameters:
-  - `secret` [integer]: private key secret. Default: nil -> random key will be generated
-  - `curve` [atom]: curve name. Default: :secp256k1
+  - `secret` [`t:binary/0`]: private key secret. Default: nil -> random key will be generated
+  - `curve_name` [`t:atom/0`]: curve name. Default: :secp256k1
 
   Returns:
-  - `private_key` [%Tezex.Crypto.PrivateKey]: private key struct
+  - `private_key` [`t:Tezex.Crypto.PrivateKey.t/0`]: private key struct
 
   ## Example:
 
       iex> Tezex.Crypto.PrivateKey.generate()
       %Tezex.Crypto.PrivateKey{...}
   """
-  def generate(secret \\ nil, curve \\ :secp256k1)
+  @spec generate(nil | binary()) :: t()
+  @spec generate(nil | binary(), atom()) :: t()
+  def generate(secret \\ nil, curve_name \\ :secp256k1)
 
-  def generate(secret, curve) when is_nil(secret) do
-    generate(Utils.between(1, KnownCurves.get_curve_by_name(curve)."N" - 1), curve)
+  def generate(secret, curve_name) when is_nil(secret) do
+    curve = KnownCurves.get_curve_by_name(curve_name)
+
+    Utils.between(1, curve."N" - 1)
+    |> Utils.string_from_number(Curve.get_length(curve))
+    |> generate(curve_name)
   end
 
-  def generate(secret, curve) do
+  def generate(secret, curve_name) when is_binary(secret) and is_atom(curve_name) do
     %PrivateKey{
       secret: secret,
-      curve: KnownCurves.get_curve_by_name(curve)
+      curve: KnownCurves.get_curve_by_name(curve_name)
     }
   end
 
@@ -57,31 +68,35 @@ defmodule Tezex.Crypto.PrivateKey do
   Gets the public associated with a private key
 
   Parameters:
-  - `private_key` [%Tezex.Crypto.PrivateKey]: private key struct
+  - `private_key` [`t:Tezex.Crypto.PrivateKey.t/0`]: private key struct
 
   Returns:
-  - `public_key` [%Tezex.Crypto.PublicKey]: public key struct
+  - `public_key` [`t:Tezex.Crypto.PublicKey.t/0`]: public key struct
 
   ## Example:
 
       iex> Tezex.Crypto.PrivateKey.get_public_key(private_key)
       %Tezex.Crypto.PublicKey{...}
   """
+  @spec get_public_key(t()) :: PublicKey.t()
   def get_public_key(private_key) do
     curve = private_key.curve
+    secret = Utils.number_from_string(private_key.secret)
 
     %PublicKey{
-      point: Math.multiply(curve."G", private_key.secret, curve."N", curve."A", curve."P"),
+      point: Math.multiply(curve."G", secret, curve."N", curve."A", curve."P"),
       curve: curve
     }
   end
 
   @doc false
+  @spec to_string(t()) :: binary()
   def to_string(private_key) do
-    Utils.string_from_number(private_key.secret, Curve.get_length(private_key.curve))
+    private_key.secret
   end
 
   @doc false
+  @spec from_string(binary()) :: {:error, map()} | {:ok, t()}
   def from_string(string, curve \\ :secp256k1) do
     {:ok, from_string!(string, curve)}
   rescue
@@ -89,24 +104,17 @@ defmodule Tezex.Crypto.PrivateKey do
   end
 
   @doc false
-  def from_string!(string, curve \\ :secp256k1) do
+  def from_string!(string, curve \\ :secp256k1) when is_binary(string) do
     curve = KnownCurves.get_curve_by_name(curve)
 
     n =
       Utils.number_from_string(string)
       |> Utils.mod(curve."N")
+      |> Utils.string_from_number(Curve.get_length(curve))
 
     %PrivateKey{
       secret: n,
       curve: curve
     }
-  end
-
-  def to_point(%PrivateKey{} = pk) do
-    curve = pk.curve
-    g = curve."G"
-    g = %Point{x: g.x, y: g.y, z: 0}
-
-    Math.multiply(g, pk.secret, curve."N", curve."A", curve."P")
   end
 end

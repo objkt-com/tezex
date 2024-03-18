@@ -1,7 +1,7 @@
 # Copied and modified from <https://github.com/starkbank/ecdsa-elixir>, Copyright (c) 2020 Stark Bank S.A, MIT License.
 defmodule Tezex.Crypto.KnownCurves do
   @moduledoc """
-  Describes the elliptic curves supported by the package
+  The supported elliptic curves
   """
 
   alias Tezex.Crypto.Curve

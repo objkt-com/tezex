@@ -20,7 +20,7 @@ defmodule Tezex.Micheline.Zarith do
       iex> Tezex.Micheline.Zarith.decode("00e1d22c")
       -365_729
   """
-  @spec decode(nonempty_binary) :: integer
+  @spec decode(nonempty_binary()) :: integer()
   def decode(binary_input) when is_binary(binary_input) do
     {%{int: integer}, _} = consume(binary_input)
     integer
@@ -39,7 +39,7 @@ defmodule Tezex.Micheline.Zarith do
       iex> Tezex.Micheline.Zarith.encode(-365_729)
       "e1d22c"
   """
-  @spec encode(integer) :: nonempty_binary
+  @spec encode(integer()) :: nonempty_binary()
   def encode(integer) when is_integer(integer) do
     sign = if integer < 0, do: 1, else: 0
 
@@ -108,7 +108,7 @@ defmodule Tezex.Micheline.Zarith do
   Takes a binary and returns the decoded integer in base 10 along with how many characters of the input binary
   were used to decode the integer.
   """
-  @spec consume(nonempty_binary) :: {%{int: integer}, pos_integer}
+  @spec consume(nonempty_binary()) :: {%{int: integer()}, pos_integer()}
   def consume(binary_input) when is_binary(binary_input) do
     {carved_int, rest} = find_int(binary_input)
 

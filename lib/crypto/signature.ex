@@ -3,8 +3,8 @@ defmodule Tezex.Crypto.Signature do
   Holds signature data.
 
   Parameters:
-  - `:r` [integer]: first signature number;
-  - `:s` [integer]: second signature number.
+  - `:r` [`t:pos_integer/0`]: first signature number;
+  - `:s` [`t:pos_integer/0`]: second signature number.
   """
   defstruct [:r, :s]
 

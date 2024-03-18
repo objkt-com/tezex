@@ -2,19 +2,20 @@
 defmodule Tezex.Crypto.Math do
   @moduledoc false
 
-  alias Tezex.Crypto.{Point, Utils}
+  alias Tezex.Crypto.Point
+  alias Tezex.Crypto.Utils
 
   @doc """
   Fast way to multiply point and scalar in elliptic curves
 
-  - `p` [%Point]: First Point to mutiply
-  - `n` [integer]: Scalar to mutiply
-  - `c_n` [integer]: Order of the elliptic curve
-  - `c_p` [integer]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
-  - `c_a` [integer]: Coefficient of the first-order term of the equation Y^2 = X^3 + c_a*X + B (mod p)
+  - `p` [`t:Tezex.Crypto.Point.t/0`]: First Point to multiply
+  - `n` [`t:integer/0`]: Scalar to multiply
+  - `c_n` [`t:integer/0`]: Order of the elliptic curve
+  - `c_p` [`t:integer/0`]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
+  - `c_a` [`t:integer/0`]: Coefficient of the first-order term of the equation Y^2 = X^3 + c_a*X + B (mod p)
 
   Returns:
-  - `point` [%Point]: point that represents the sum of First and Second Point
+  - `point` [`t:Tezex.Crypto.Point.t/0`]: point that represents the sum of First and Second Point
   """
   @spec multiply(Point.t(), integer, integer, integer, integer) :: Point.t()
   def multiply(p, n, c_n, c_a, c_p) do
@@ -27,13 +28,13 @@ defmodule Tezex.Crypto.Math do
   @doc """
   Fast way to add two points in elliptic curves
 
-  - `p` [%Point]: First Point you want to add
-  - `q` [%Point]: Second Point you want to add
-  - `c_p` [integer]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
-  - `c_a` [integer]: Coefficient of the first-order term of the equation Y^2 = X^3 + c_a*X + B (mod p)
+  - `p` [`t:Tezex.Crypto.Point.t/0`]: First Point you want to add
+  - `q` [`t:Tezex.Crypto.Point.t/0`]: Second Point you want to add
+  - `c_p` [`t:integer/0`]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
+  - `c_a` [`t:integer/0`]: Coefficient of the first-order term of the equation Y^2 = X^3 + c_a*X + B (mod p)
 
   Returns:
-  - `point` [%Point]: point that represents the sum of First and Second Point
+  - `point` [`t:Tezex.Crypto.Point.t/0`]: point that represents the sum of First and Second Point
   """
   @spec add(Point.t(), Point.t(), integer, integer) :: Point.t()
   def add(p, q, c_a, c_p) do
@@ -44,11 +45,11 @@ defmodule Tezex.Crypto.Math do
   @doc """
   Extended Euclidean Algorithm. It's the 'division' in elliptic curves
 
-  - `x` [integer]: Divisor
-  - `n` [integer]: Mod for division
+  - `x` [`t:integer/0`]: Divisor
+  - `n` [`t:integer/0`]: Mod for division
 
   Returns:
-  - `value` [integer]: value representing the division
+  - `value` [`t:integer/0`]: value representing the division
   """
   def inv(x, _n) when x == 0 do
     0
@@ -71,11 +72,11 @@ defmodule Tezex.Crypto.Math do
 
   # Converts point back from Jacobian coordinates
 
-  # - `p` [integer]: First Point you want to add
-  # - `c_p` [integer]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
+  # - `p` [`t:Tezex.Crypto.Point.t/0`]: Point you want to add
+  # - `c_p` [`t:integer/0`]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
 
   # Returns:
-  # - `point` [%Point]: point in default coordinates
+  # - `point` [`t:Tezex.Crypto.Point.t/0`]: point in default coordinates
   defp to_jacobian(p) do
     %Point{x: p.x, y: p.y, z: 1}
   end
@@ -84,146 +85,132 @@ defmodule Tezex.Crypto.Math do
     z = inv(p.z, c_p)
 
     %Point{
-      x:
-        Utils.mod(
-          p.x * Utils.ipow(z, 2),
-          c_p
-        ),
-      y:
-        Utils.mod(
-          p.y * Utils.ipow(z, 3),
-          c_p
-        )
+      x: Utils.mod(p.x * Utils.ipow(z, 2), c_p),
+      y: Utils.mod(p.y * Utils.ipow(z, 3), c_p)
     }
   end
 
   # Doubles a point in elliptic curves
 
-  # - `p` [integer]: Point you want to double
-  # - `c_p` [integer]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
-  # - `c_a` [integer]: Coefficient of the first-order term of the equation Y^2 = X^3 + c_a*X + B (mod p)
+  # - `p` [`t:Tezex.Crypto.Point.t/0`]: Point you want to double
+  # - `c_p` [`t:integer/0`]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
+  # - `c_a` [`t:integer/0`]: Coefficient of the first-order term of the equation Y^2 = X^3 + c_a*X + B (mod p)
 
   # Returns:
-  # - `point` [%Point]: point that represents the sum of First and Second Point
+  # - `point` [`t:Tezex.Crypto.Point.t/0`]: point that represents the sum of First and Second Point
+  defp jacobian_double(%Point{y: 0}, _c_a, _c_p), do: %Point{x: 0, y: 0, z: 0}
+
   defp jacobian_double(p, c_a, c_p) do
-    if p.y == 0 do
-      %Point{x: 0, y: 0, z: 0}
+    ysq =
+      Utils.ipow(p.y, 2)
+      |> Utils.mod(c_p)
+
+    s =
+      (4 * p.x * ysq)
+      |> Utils.mod(c_p)
+
+    m =
+      (3 * Utils.ipow(p.x, 2) + c_a * Utils.ipow(p.z, 4))
+      |> Utils.mod(c_p)
+
+    nx =
+      (Utils.ipow(m, 2) - 2 * s)
+      |> Utils.mod(c_p)
+
+    ny =
+      (m * (s - nx) - 8 * Utils.ipow(ysq, 2))
+      |> Utils.mod(c_p)
+
+    nz =
+      (2 * p.y * p.z)
+      |> Utils.mod(c_p)
+
+    %Point{x: nx, y: ny, z: nz}
+  end
+
+  # Adds two points in the elliptic curve
+  # - `p` [`t:Tezex.Crypto.Point.t/0`]: First Point you want to add
+  # - `q` [`t:Tezex.Crypto.Point.t/0`]: Second Point you want to add
+  # - `c_p` [`t:integer/0`]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
+  # - `c_a` [`t:integer/0`]: Coefficient of the first-order term of the equation Y^2 = X^3 + c_a*X + B (mod p)
+
+  # Returns:
+  # - `point` [`t:Tezex.Crypto.Point.t/0`]: point that represents the sum of first and second Point
+  @spec jacobian_add(Point.t(), Point.t(), integer(), integer()) :: Point.t()
+  defp jacobian_add(%Point{y: 0}, q, _c_a, _c_p), do: q
+  defp jacobian_add(p, %Point{y: 0}, _c_a, _c_p), do: p
+
+  defp jacobian_add(p, q, c_a, c_p) do
+    u1 =
+      (p.x * Utils.ipow(q.z, 2))
+      |> Utils.mod(c_p)
+
+    u2 =
+      (q.x * Utils.ipow(p.z, 2))
+      |> Utils.mod(c_p)
+
+    s1 =
+      (p.y * Utils.ipow(q.z, 3))
+      |> Utils.mod(c_p)
+
+    s2 =
+      (q.y * Utils.ipow(p.z, 3))
+      |> Utils.mod(c_p)
+
+    if u1 == u2 do
+      if s1 != s2 do
+        %Point{x: 0, y: 0, z: 1}
+      else
+        jacobian_double(p, c_a, c_p)
+      end
     else
-      ysq =
-        Utils.ipow(p.y, 2)
+      h = u2 - u1
+      r = s2 - s1
+
+      h2 =
+        (h * h)
         |> Utils.mod(c_p)
 
-      s =
-        (4 * p.x * ysq)
+      h3 =
+        (h * h2)
         |> Utils.mod(c_p)
 
-      m =
-        (3 * Utils.ipow(p.x, 2) + c_a * Utils.ipow(p.z, 4))
+      u1h2 =
+        (u1 * h2)
         |> Utils.mod(c_p)
 
       nx =
-        (Utils.ipow(m, 2) - 2 * s)
+        (Utils.ipow(r, 2) - h3 - 2 * u1h2)
         |> Utils.mod(c_p)
 
       ny =
-        (m * (s - nx) - 8 * Utils.ipow(ysq, 2))
+        (r * (u1h2 - nx) - s1 * h3)
         |> Utils.mod(c_p)
 
       nz =
-        (2 * p.y * p.z)
+        (h * p.z * q.z)
         |> Utils.mod(c_p)
 
       %Point{x: nx, y: ny, z: nz}
     end
   end
 
-  # Adds two points in the elliptic curve
-  # - `p` [integer]: First Point you want to add
-  # - `q` [integer]: Second Point you want to add
-  # - `c_p` [integer]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
-  # - `c_a` [integer]: Coefficient of the first-order term of the equation Y^2 = X^3 + c_a*X + B (mod p)
+  # Multiply point and scalar on elliptic curves
+
+  # - `p` [`t:Tezex.Crypto.Point.t/0`]: Point to multiply
+  # - `n` [`t:integer/0`]: Scalar to multiply
+  # - `c_n` [`t:integer/0`]: Order of the elliptic curve
+  # - `c_p` [`t:integer/0`]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
+  # - `c_a` [`t:integer/0`]: Coefficient of the first-order term of the equation Y^2 = X^3 + c_a*X + B (mod p)
 
   # Returns:
-  # - `point` [%Point]: point that represents the sum of first and second Point
-  defp jacobian_add(p, q, c_a, c_p) do
-    if p.y == 0 do
-      q
-    else
-      if q.y == 0 do
-        p
-      else
-        u1 =
-          (p.x * Utils.ipow(q.z, 2))
-          |> Utils.mod(c_p)
-
-        u2 =
-          (q.x * Utils.ipow(p.z, 2))
-          |> Utils.mod(c_p)
-
-        s1 =
-          (p.y * Utils.ipow(q.z, 3))
-          |> Utils.mod(c_p)
-
-        s2 =
-          (q.y * Utils.ipow(p.z, 3))
-          |> Utils.mod(c_p)
-
-        if u1 == u2 do
-          if s1 != s2 do
-            %Point{x: 0, y: 0, z: 1}
-          else
-            jacobian_double(p, c_a, c_p)
-          end
-        else
-          h = u2 - u1
-
-          r = s2 - s1
-
-          h2 =
-            (h * h)
-            |> Utils.mod(c_p)
-
-          h3 =
-            (h * h2)
-            |> Utils.mod(c_p)
-
-          u1h2 =
-            (u1 * h2)
-            |> Utils.mod(c_p)
-
-          nx =
-            (Utils.ipow(r, 2) - h3 - 2 * u1h2)
-            |> Utils.mod(c_p)
-
-          ny =
-            (r * (u1h2 - nx) - s1 * h3)
-            |> Utils.mod(c_p)
-
-          nz =
-            (h * p.z * q.z)
-            |> Utils.mod(c_p)
-
-          %Point{x: nx, y: ny, z: nz}
-        end
-      end
-    end
-  end
-
-  # Multily point and scalar in elliptic curves
-
-  # - `p` [integer]: First Point to mutiply
-  # - `n` [integer]: Scalar to mutiply
-  # - `c_n` [integer]: Order of the elliptic curve
-  # - `c_p` [integer]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
-  # - `c_a` [integer]: Coefficient of the first-order term of the equation Y^2 = X^3 + c_a*X + B (mod p)
-
-  # Returns:
-  # - `point` [%Point]: point that represents the sum of First and Second Point
-  defp jacobian_multiply(_p, n, _c_n, _c_a, _c_p) when n == 0 do
+  # - `point` [`t:Tezex.Crypto.Point.t/0`]: point that represents the sum of First and Second Point
+  @spec jacobian_multiply(Point.t(), integer(), integer(), integer(), integer()) :: Point.t()
+  defp jacobian_multiply(_p, 0, _c_n, _c_a, _c_p) do
     %Point{x: 0, y: 0, z: 1}
   end
 
-  defp jacobian_multiply(p, n, _c_n, _c_a, _c_p) when n == 1 do
+  defp jacobian_multiply(p, 1, _c_n, _c_a, _c_p) do
     if p.y == 0 do
       %Point{x: 0, y: 0, z: 1}
     else
@@ -239,7 +226,7 @@ defmodule Tezex.Crypto.Math do
     end
   end
 
-  defp jacobian_multiply(p, _n, _c_n, _c_a, _c_p) when p.y == 0 do
+  defp jacobian_multiply(%Point{y: 0}, _n, _c_n, _c_a, _c_p) do
     %Point{x: 0, y: 0, z: 1}
   end
 

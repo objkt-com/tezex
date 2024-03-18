@@ -5,8 +5,10 @@ A collection of utils to work with the Tezos blockchain using Elixir: parsing Mi
 
 Read the documentation on [hexdocs](https://hexdocs.pm/tezex/).
 
+This lib contains a full, pure Elixir implementation of [HMAC-DRBG](https://hexdocs.pm/tezex/Tezex.Crypto.HMACDRBG.html), tested with [NIST CAPV](https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program) fixtures. We might extract it to a separate lib in the future.
+
 Since what this lib provides is so far limited to what we need at [objkt.com](https://objkt.com), external contributions are most welcome.
-For instance if you need to sign messages or transactions, or translating Micheline to hex, we'd love to collaborate on a PR.
+For instance if you need to sign messages or transactions with a passphrase-protected private key, or translating Micheline to hex, we'd love to collaborate on a PR.
 
 ## Installation
 

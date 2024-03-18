@@ -1,4 +1,4 @@
-defmodule Tezex.Crypto.HMACDRBG.Test do
+defmodule Tezex.Crypto.HMACDRBGTest do
   alias Tezex.Crypto.HMACDRBG
   use ExUnit.Case
 

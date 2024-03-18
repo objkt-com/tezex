@@ -63,19 +63,7 @@ defmodule Tezex.Micheline do
 
   # sequence
   def hex_to_micheline(<<"02", length::binary-size(8), rest::binary>>) do
-    length = hex_to_dec(length) * 2
-
-    {xs, consumed} =
-      Stream.cycle([nil])
-      |> Enum.reduce_while({[], rest, 0}, fn _, {acc, part, consumed} ->
-        if consumed < length do
-          {content, length} = hex_to_micheline(part)
-          <<_consumed::binary-size(length), part::binary>> = part
-          {:cont, {[content | acc], part, consumed + length}}
-        else
-          {:halt, {acc, consumed}}
-        end
-      end)
+    {xs, consumed} = read_sequence(rest, 0, hex_to_dec(length) * 2, [])
 
     {Enum.reverse(xs), consumed + 8 + 2}
   end
@@ -203,7 +191,7 @@ defmodule Tezex.Micheline do
     {%{bytes: bytes}, length + 2}
   end
 
-  @spec micheline_hex_to_string(binary) :: {binary, pos_integer}
+  @spec micheline_hex_to_string(binary()) :: {binary(), pos_integer()}
   def micheline_hex_to_string(<<length::binary-size(8), rest::binary>>) do
     length = hex_to_dec(length) * 2
     <<text::binary-size(length), _rest::binary>> = rest
@@ -269,5 +257,15 @@ defmodule Tezex.Micheline do
   defp hex_to_dec(hex) do
     {d, ""} = Integer.parse(hex, 16)
     d
+  end
+
+  defp read_sequence(to_read, consumed, length, acc) when consumed < length do
+    {content, l} = hex_to_micheline(to_read)
+    <<_consumed::binary-size(l), to_read::binary>> = to_read
+    read_sequence(to_read, consumed + l, length, [content | acc])
+  end
+
+  defp read_sequence(_to_read, consumed, _length, acc) do
+    {acc, consumed}
   end
 end

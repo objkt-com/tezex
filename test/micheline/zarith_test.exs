@@ -1,4 +1,4 @@
-defmodule Tezex.Micheline.Zarith.Test do
+defmodule Tezex.Micheline.ZarithTest do
   use ExUnit.Case
   alias Tezex.Micheline
   alias Tezex.Micheline.Zarith

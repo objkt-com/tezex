@@ -1,4 +1,4 @@
-defmodule Tezex.Micheline.Test do
+defmodule Tezex.MichelineTest do
   use ExUnit.Case
   alias Tezex.Micheline
   doctest Tezex.Micheline
