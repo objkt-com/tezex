@@ -30,7 +30,7 @@ defmodule Tezex.Micheline do
       iex> Tezex.Micheline.read_packed("0200e1d22c")
       %{int: -365_729}
   """
-  @spec read_packed(binary) :: map | list(map)
+  @spec read_packed(binary()) :: map() | list(map())
   def read_packed(<<_::binary-size(2), rest::binary>>) do
     {val, _consumed} = hex_to_micheline(rest)
     val
@@ -47,7 +47,7 @@ defmodule Tezex.Micheline do
       iex> Tezex.Micheline.hex_to_micheline("00e1d22c")
       {%{int: -365729}, 8}
   """
-  @spec hex_to_micheline(binary) :: {map | list(map), pos_integer}
+  @spec hex_to_micheline(binary()) :: {map() | list(map()), pos_integer()}
   # literal int or nat
   def hex_to_micheline("00" <> rest) do
     {result, consumed} = Zarith.consume(rest)
@@ -63,19 +63,7 @@ defmodule Tezex.Micheline do
 
   # sequence
   def hex_to_micheline(<<"02", length::binary-size(8), rest::binary>>) do
-    length = hex_to_dec(length) * 2
-
-    {xs, consumed} =
-      Stream.cycle([nil])
-      |> Enum.reduce_while({[], rest, 0}, fn _, {acc, part, consumed} ->
-        if consumed < length do
-          {content, length} = hex_to_micheline(part)
-          <<_consumed::binary-size(length), part::binary>> = part
-          {:cont, {[content | acc], part, consumed + length}}
-        else
-          {:halt, {acc, consumed}}
-        end
-      end)
+    {xs, consumed} = read_sequence(rest, 0, hex_to_dec(length) * 2, [])
 
     {Enum.reverse(xs), consumed + 8 + 2}
   end
@@ -203,11 +191,26 @@ defmodule Tezex.Micheline do
     {%{bytes: bytes}, length + 2}
   end
 
-  @spec micheline_hex_to_string(binary) :: {binary, pos_integer}
+  @spec micheline_hex_to_string(binary()) :: {binary(), pos_integer()}
   def micheline_hex_to_string(<<length::binary-size(8), rest::binary>>) do
     length = hex_to_dec(length) * 2
     <<text::binary-size(length), _rest::binary>> = rest
     {text, length + 8}
+  end
+
+  @doc """
+  Encode a string to its Micheline representation:
+  * `"05"` to indicate that it is a Micheline expression
+  * `"01"` to indicate that it is a Micheline string
+  * byte size encoded on 4 bytes
+  * hex representation of the string
+  """
+  @spec string_to_micheline_hex(binary()) :: binary()
+  def string_to_micheline_hex(bytes) do
+    hex_bytes = :binary.encode_hex(bytes)
+    padded_bytes_size = String.pad_leading("#{trunc(byte_size(hex_bytes) / 2)}", 8, "0")
+
+    "0501" <> padded_bytes_size <> hex_bytes
   end
 
   @doc """
@@ -219,7 +222,7 @@ defmodule Tezex.Micheline do
       iex> Tezex.Micheline.decode_optimized_address("10007fc95c97fd368cd9055610ee79e64ff9e0b5285c")
       {:error, :invalid}
   """
-  @spec decode_optimized_address(<<_::_*16>>) :: {:error, :invalid} | {:ok, nonempty_binary()}
+  @spec decode_optimized_address(binary()) :: {:error, :invalid} | {:ok, nonempty_binary()}
   def decode_optimized_address(hex) do
     {prefix, pkh} =
       case :binary.decode_hex(hex) do
@@ -254,5 +257,15 @@ defmodule Tezex.Micheline do
   defp hex_to_dec(hex) do
     {d, ""} = Integer.parse(hex, 16)
     d
+  end
+
+  defp read_sequence(to_read, consumed, length, acc) when consumed < length do
+    {content, l} = hex_to_micheline(to_read)
+    <<_consumed::binary-size(l), to_read::binary>> = to_read
+    read_sequence(to_read, consumed + l, length, [content | acc])
+  end
+
+  defp read_sequence(_to_read, consumed, _length, acc) do
+    {acc, consumed}
   end
 end
