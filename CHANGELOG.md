@@ -1,5 +1,9 @@
 # Changelog for Tezex
 
+## v2.0.0
+
+- [BREAKING]: `Tezex.Micheline` now only takes care of `PACK`ing and `UNPACK`ing, forging and unforging is now in `Tezex.Forge`
+- [BREAKING]: `Tezex.Micheline.Zarith` is replaced with `Tezex.Zarith`
 
 ## v1.2.0
 

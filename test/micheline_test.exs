@@ -1,115 +1,136 @@
 defmodule Tezex.MichelineTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+
+  alias Tezex.Forge
   alias Tezex.Micheline
+
   doctest Tezex.Micheline
 
-  test "Small int: hex -> Micheline" do
-    assert {%{int: 6}, _} = Micheline.hex_to_micheline("0006")
+  describe "pack" do
+    result = Micheline.pack(9, :int)
+    assert result == "050009"
 
-    assert {%{int: -6}, _} = Micheline.hex_to_micheline("0046")
+    result = Micheline.pack(9, :nat)
+    assert result == "050009"
 
-    assert {%{int: 63}, _} = Micheline.hex_to_micheline("003f")
+    result = Micheline.pack(-9, :int)
+    assert result == "050049"
 
-    assert {%{int: -63}, _} = Micheline.hex_to_micheline("007f")
+    result = Micheline.pack(-6407, :int)
+    assert result == "0500c764"
+
+    result = Micheline.pack(98_978_654, :int)
+    assert result == "05009eadb25e"
+
+    result = Micheline.pack(-78_181_343_541, :int)
+    assert result == "0500f584c5bfc604"
+
+    result = Micheline.pack("tz1eEnQhbwf6trb8Q8mPb2RaPkNk2rN7BKi8", :address)
+    assert result == "050a000000160000cc04e65d3e38e4e8059041f27a649c76630f95e2"
+
+    result = Micheline.pack("tz1eEnQhbwf6trb8Q8mPb2RaPkNk2rN7BKi8", :key_hash)
+    assert result == "050a000000160000cc04e65d3e38e4e8059041f27a649c76630f95e2"
+
+    result = Micheline.pack("Tezos Tacos Nachos", :string)
+    assert result == "05010000001254657a6f73205461636f73204e6163686f73"
+
+    result = Micheline.pack(:binary.decode_hex("0a0a0a"), :bytes)
+    assert result == "050a000000030a0a0a"
+
+    result = Micheline.pack(%{"prim" => "Pair", "args" => [%{"int" => "1"}, %{"int" => "12"}]})
+    assert result == "0507070001000c"
+
+    value = %{
+      "prim" => "Pair",
+      "args" => [
+        %{"int" => "42"},
+        %{
+          "prim" => "Left",
+          "args" => [
+            %{
+              "prim" => "Left",
+              "args" => [
+                %{"prim" => "Pair", "args" => [%{"int" => "1585470660"}, %{"int" => "900100"}]}
+              ]
+            }
+          ]
+        }
+      ]
+    }
+
+    assert Micheline.pack(value) == "050707002a0505050507070084f382e80b0084f06d"
   end
 
-  test "Medium int: hex -> Micheline" do
-    assert {%{int: 97}, _} = Micheline.hex_to_micheline("00a101")
+  describe "unpack" do
+    test "micheline" do
+      # https://better-call.dev/ghostnet/opg/opBDW8y9HYyhPysKT8YYzgZC8rKFnHUwnkxAXYQaajgiotdMf2v/contents
+      expected = [
+        %{
+          "args" => [
+            %{"bytes" => "0000078694ecd15392219b7e47814ecfa11f90192642"},
+            %{"int" => "5000"}
+          ],
+          "prim" => "Elt"
+        },
+        %{
+          "args" => [
+            %{"bytes" => "00007fc95c97fd368cd9055610ee79e64ff9e0b5285c"},
+            %{"int" => "5000"}
+          ],
+          "prim" => "Elt"
+        }
+      ]
 
-    assert {%{int: -127}, _} = Micheline.hex_to_micheline("00ff01")
+      assert expected ==
+               Micheline.unpack(
+                 "05020000004007040a000000160000078694ecd15392219b7e47814ecfa11f9019264200884e07040a0000001600007fc95c97fd368cd9055610ee79e64ff9e0b5285c00884e"
+               )
 
-    assert {%{int: 900}, _} = Micheline.hex_to_micheline("00840e")
+      assert ["tz1LKpeN8ZSSFNyTWiBNaE4u4sjaq7J1Vz2z", "tz1XHhjLXQuG9rf9n7o1VbgegMkiggy1oktu"] ==
+               Enum.map(expected, fn %{"args" => [%{"bytes" => bytes} | _]} ->
+                 bytes
+                 |> :binary.decode_hex()
+                 |> Forge.unforge_address()
+               end)
+    end
 
-    assert {%{int: -900}, _} = Micheline.hex_to_micheline("00c40e")
-  end
+    test "various values" do
+      result = Micheline.unpack("050009", :int)
+      assert result == 9
 
-  test "Large int: hex -> Micheline" do
-    assert {%{int: 917_431_994}, _} = Micheline.hex_to_micheline("00ba9af7ea06")
+      result = Micheline.unpack("050009", :nat)
+      assert result == 9
 
-    assert {%{int: -917_431_994}, _} = Micheline.hex_to_micheline("00fa9af7ea06")
+      result = Micheline.unpack("050049", :int)
+      assert result == -9
 
-    assert {%{int: 365_729}, _} = Micheline.hex_to_micheline("00a1d22c")
+      result = Micheline.unpack("0500c764", :int)
+      assert result == -6407
 
-    assert {%{int: -365_729}, _} = Micheline.hex_to_micheline("00e1d22c")
+      result = Micheline.unpack("05009eadb25e", :int)
+      assert result == 98_978_654
 
-    assert {%{int: 610_913_435_200}, _} = Micheline.hex_to_micheline("0080f9b9d4c723")
+      result = Micheline.unpack("0500f584c5bfc604", :int)
+      assert result == -78_181_343_541
 
-    assert {%{int: -610_913_435_200}, _} = Micheline.hex_to_micheline("00c0f9b9d4c723")
-  end
+      result =
+        Micheline.unpack("050a0000001500cc04e65d3e38e4e8059041f27a649c76630f95e2", :key_hash)
 
-  test "strings" do
-    {result, 122} =
-      Micheline.hex_to_micheline(
-        "0100000038697066733a2f2f516d54556177504451526557325754514d6869725967416b707854427a487a616e3646465846776b685071654d6a2f3434"
-      )
+      assert result == "tz1eEnQhbwf6trb8Q8mPb2RaPkNk2rN7BKi8"
 
-    assert result == %{string: "ipfs://QmTUawPDQReW2WTQMhirYgAkpxTBzHzan6FFXFwkhPqeMj/44"}
-  end
+      result =
+        Micheline.unpack("050a0000001601e67bac124dff100a57644de0cf26d341ebf9492600", :address)
 
-  test "bytes" do
-    {result, _} = Micheline.hex_to_micheline("0a000000080123456789abcdef")
-    assert result == %{bytes: "0123456789abcdef"}
-  end
+      assert result == "KT1VbT8n6YbrzPSjdAscKfJGDDNafB5yHn1H"
 
-  test "Mixed literal value array" do
-    assert {[%{int: -33}, %{string: "tezos"}, %{string: ""}, %{string: "cryptonomic"}], 76} =
-             Micheline.hex_to_micheline(
-               "02000000210061010000000574657a6f730100000000010000000b63727970746f6e6f6d6963"
-             )
-  end
+      result = Micheline.unpack("05010000001254657a6f73205461636f73204e6163686f73", :string)
+      assert result == "Tezos Tacos Nachos"
 
-  test "Bare primitive" do
-    assert {%{prim: "PUSH"}, 4} = Micheline.hex_to_micheline("0343")
-  end
+      result = Micheline.unpack("050a000000030a0a0a", :bytes)
+      assert result == "0a0a0a"
 
-  test "Single primitive with a single annotation" do
-    assert {%{annot: "@cba", prim: "PUSH"}, 20} =
-             Micheline.hex_to_micheline("04430000000440636261")
-  end
-
-  test "Single primitive with a single argument" do
-    {result, _} = Micheline.hex_to_micheline("053d036d")
-    assert result == %{prim: "NIL", args: [%{prim: "operation"}]}
-  end
-
-  test "Single primitive with two arguments" do
-    assert {%{annots: ["@cba"], args: [%{prim: "operation"}], prim: "NIL"}, 24} =
-             Micheline.hex_to_micheline("063d036d0000000440636261")
-
-    assert {%{args: [%{prim: "operation"}, %{prim: "operation"}], prim: "NIL"}, 12} =
-             Micheline.hex_to_micheline("073d036d036d")
-  end
-
-  test "Single primitive with two arguments and annotation" do
-    assert {%{
-              annots: ["@cba"],
-              args: [%{prim: "operation"}, %{prim: "operation"}],
-              prim: "NIL"
-            }, 28} = Micheline.hex_to_micheline("083d036d036d0000000440636261")
-  end
-
-  test "Single primitive with more than two arguments and no annotations" do
-    assert {%{
-              args: [%{prim: "operation"}, %{prim: "operation"}, %{prim: "operation"}],
-              prim: "NIL"
-            }, 32} = Micheline.hex_to_micheline("093d00000006036d036d036d00000000")
-  end
-
-  test "Single primitive with more than two arguments and multiple annotations" do
-    assert {%{
-              annots: ["@red", "@green", "@blue"],
-              args: [%{prim: "operation"}, %{prim: "operation"}, %{prim: "operation"}],
-              prim: "NIL"
-            },
-            66} =
-             Micheline.hex_to_micheline(
-               "093d00000006036d036d036d00000011407265642040677265656e2040626c7565"
-             )
-  end
-
-  test "Encode/decode string" do
-    assert "050100000003666F6F" == Micheline.string_to_micheline_hex("foo")
-    s = "0100000003666F6F"
-    assert {%{string: "foo"}, byte_size(s)} == Micheline.hex_to_micheline(s)
+      result = Micheline.unpack("0507070001000c")
+      assert result == %{"prim" => "Pair", "args" => [%{"int" => "1"}, %{"int" => "12"}]}
+    end
   end
 end

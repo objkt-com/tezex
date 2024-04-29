@@ -1,5 +1,5 @@
 defmodule Tezex.Crypto.ECDSATest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   alias Tezex.Crypto.ECDSA
   alias Tezex.Crypto.KnownCurves

@@ -66,7 +66,7 @@ defmodule Tezex.Crypto do
     end
   end
 
-  defp extract_pubkey(pubkey) do
+  def extract_pubkey(pubkey) do
     case Base58Check.decode58(pubkey) do
       {:ok, <<@prefix_edpk, public_key::binary-size(32)>> <> _} -> {:ok, public_key}
       {:ok, <<@prefix_sppk, public_key::binary-size(33)>> <> _} -> {:ok, public_key}
@@ -255,8 +255,8 @@ defmodule Tezex.Crypto do
       iex> encoded_private_key = "spsk24EJohZHJkZnWEzj3w9wE7BFARpFmq5WAo9oTtqjdJ2t4pyoB3"
       iex> Tezex.Crypto.sign_message(encoded_private_key, "foo")
       "sigm9uJiGjdk2DpuqTmHcjzpAdTSQfqKxFuDKodyNT8JP3UvrfoPFTNkFbFgDP1WfAi2PjJ3dcpZFLTagD7gUBmwVWbPr5mk"
-      iex> msg = Tezex.Micheline.string_to_micheline_hex("foo")
-      "050100000003666F6F"
+      iex> msg = Tezex.Micheline.pack("foo", :string)
+      "050100000003666f6f"
       iex> Tezex.Crypto.sign_message(encoded_private_key, msg)
       "sigm9uJiGjdk2DpuqTmHcjzpAdTSQfqKxFuDKodyNT8JP3UvrfoPFTNkFbFgDP1WfAi2PjJ3dcpZFLTagD7gUBmwVWbPr5mk"
   """
@@ -266,7 +266,7 @@ defmodule Tezex.Crypto do
   end
 
   def sign_message(privkey_param, bytes) do
-    sign(privkey_param, Micheline.string_to_micheline_hex(bytes))
+    sign(privkey_param, Micheline.pack(bytes, :string))
   end
 
   @spec sign(privkey_param(), binary(), binary()) :: nonempty_binary()

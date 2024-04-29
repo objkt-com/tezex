@@ -1,271 +1,107 @@
 defmodule Tezex.Micheline do
-  @moduledoc """
-  Decode Micheline code.
-  """
-  alias Tezex.Micheline.Zarith
+  alias Tezex.Forge
+  alias Tezex.Zarith
 
-  @kw ~w(
-      parameter storage code False Elt Left None Pair Right Some True Unit PACK UNPACK
-      BLAKE2B SHA256 SHA512 ABS ADD AMOUNT AND BALANCE CAR CDR CHECK_SIGNATURE COMPARE CONCAT
-      CONS CREATE_ACCOUNT CREATE_CONTRACT IMPLICIT_ACCOUNT DIP DROP DUP EDIV EMPTY_MAP EMPTY_SET
-      EQ EXEC FAILWITH GE GET GT HASH_KEY IF IF_CONS IF_LEFT IF_NONE INT LAMBDA LE LEFT
-      LOOP LSL LSR LT MAP MEM MUL NEG NEQ NIL NONE NOT NOW OR PAIR PUSH RIGHT SIZE
-      SOME SOURCE SENDER SELF STEPS_TO_QUOTA SUB SWAP TRANSFER_TOKENS SET_DELEGATE UNIT UPDATE XOR
-      ITER LOOP_LEFT ADDRESS CONTRACT ISNAT CAST RENAME bool contract int key key_hash lambda
-      list map big_map nat option or pair set signature string bytes mutez timestamp unit
-      operation address SLICE DIG DUG EMPTY_BIG_MAP APPLY chain_id CHAIN_ID LEVEL SELF_ADDRESS
-      never NEVER UNPAIR VOTING_POWER TOTAL_VOTING_POWER KECCAK SHA3 PAIRING_CHECK bls12_381_g1
-      bls12_381_g2 bls12_381_fr sapling_state sapling_transaction SAPLING_EMPTY_STATE SAPLING_VERIFY_UPDATE
-      ticket TICKET READ_TICKET SPLIT_TICKET JOIN_TICKETS GET_AND_UPDATE chest chest_key OPEN_CHEST
-      VIEW view constant
-    )
-
+  @typep pack_types :: nil | :address | :bytes | :int | :key_hash | :nat | :string
+  @spec pack(binary() | integer() | map(), pack_types()) :: nonempty_binary()
+  @spec pack(binary() | integer() | map()) :: nonempty_binary()
   @doc """
-  Parse a single message from a Micheline packed message.
+  Serialize a piece of data to its optimized binary representation.
 
   ## Examples
-      iex> Tezex.Micheline.read_packed("02000000210061010000000574657a6f730100000000010000000b63727970746f6e6f6d6963")
-      %{int: 33}
-
-      iex> Tezex.Micheline.read_packed("0200e1d22c")
-      %{int: -365_729}
+      iex> Micheline.pack(-6407, :int)
+      "0500c764"
+      iex> Micheline.pack(%{"prim" => "Pair", "args" => [%{"int" => "-33"}, %{"int" => "71"}]})
+      "0507070061008701"
   """
-  @spec read_packed(binary()) :: map() | list(map())
-  def read_packed(<<_::binary-size(2), rest::binary>>) do
-    {val, _consumed} = hex_to_micheline(rest)
-    val
-  end
+  def pack(value, type \\ nil) do
+    case type do
+      :int ->
+        "0500" <> Zarith.encode(value)
 
-  @doc """
-  Parse a Micheline hex string, return a tuple `{result, consumed}` containing
-  a list of Micheline objects as maps, and the number of bytes that was consumed in the process.
+      :nat ->
+        "0500" <> Zarith.encode(value)
 
-  ## Examples
-      iex> Tezex.Micheline.hex_to_micheline("02000000210061010000000574657a6f730100000000010000000b63727970746f6e6f6d6963")
-      {[%{int: -33}, %{string: "tezos"}, %{string: ""}, %{string: "cryptonomic"}], 76}
+      :string ->
+        hex_bytes = :binary.encode_hex(value, :lowercase)
+        "0501" <> encode_byte_size(hex_bytes) <> hex_bytes
 
-      iex> Tezex.Micheline.hex_to_micheline("00e1d22c")
-      {%{int: -365729}, 8}
-  """
-  @spec hex_to_micheline(binary()) :: {map() | list(map()), pos_integer()}
-  # literal int or nat
-  def hex_to_micheline("00" <> rest) do
-    {result, consumed} = Zarith.consume(rest)
-    {result, consumed + 2}
-  end
+      :bytes ->
+        hex_bytes = :binary.encode_hex(value, :lowercase)
+        "050a#{encode_byte_size(hex_bytes)}#{hex_bytes}"
 
-  # literal string
-  def hex_to_micheline("01" <> rest) do
-    {hex_string, length} = micheline_hex_to_string(rest)
+      :key_hash ->
+        address = :binary.encode_hex(Forge.forge_address(value), :lowercase)
+        "050a#{encode_byte_size(address)}#{address}"
 
-    {%{string: :binary.decode_hex(hex_string)}, length + 2}
-  end
+      :address ->
+        address = :binary.encode_hex(Forge.forge_address(value), :lowercase)
+        "050a#{encode_byte_size(address)}#{address}"
 
-  # sequence
-  def hex_to_micheline(<<"02", length::binary-size(8), rest::binary>>) do
-    {xs, consumed} = read_sequence(rest, 0, hex_to_dec(length) * 2, [])
-
-    {Enum.reverse(xs), consumed + 8 + 2}
-  end
-
-  # primitive / no arg / no annot
-  def hex_to_micheline("03" <> rest) do
-    {kw, consumed} = code_to_kw(rest)
-    {%{prim: kw}, 2 + consumed}
-  end
-
-  # primitive / no arg / annot
-  def hex_to_micheline("04" <> rest) do
-    tot_consumed = 2
-    {kw, consumed} = code_to_kw(rest)
-    tot_consumed = consumed + tot_consumed
-    <<_consumed::binary-size(consumed), rest::binary>> = rest
-
-    {annot, consumed} = micheline_hex_to_string(rest)
-    annot = :binary.decode_hex(annot)
-
-    {%{prim: kw, annot: annot}, consumed + tot_consumed}
-  end
-
-  # primitive / 1 arg / no annot
-  def hex_to_micheline("05" <> rest) do
-    tot_consumed = 2
-
-    {kw, consumed} = code_to_kw(rest)
-    tot_consumed = consumed + tot_consumed
-    <<_consumed::binary-size(consumed), rest::binary>> = rest
-
-    {arg, consumed} = hex_to_micheline(rest)
-    tot_consumed = consumed + tot_consumed
-
-    {%{prim: kw, args: [arg]}, tot_consumed}
-  end
-
-  # primitive / 1 arg / annot
-  def hex_to_micheline("06" <> rest) do
-    tot_consumed = 2
-
-    {kw, consumed} = code_to_kw(rest)
-    tot_consumed = consumed + tot_consumed
-    <<_consumed::binary-size(consumed), rest::binary>> = rest
-
-    {arg, consumed} = hex_to_micheline(rest)
-    tot_consumed = consumed + tot_consumed
-    <<_consumed::binary-size(consumed), rest::binary>> = rest
-
-    {annot, consumed} = micheline_hex_to_string(rest)
-    tot_consumed = consumed + tot_consumed
-
-    {%{prim: kw, args: [arg], annots: decode_annotations(annot)}, tot_consumed}
-  end
-
-  # primitive / 2 arg / no annot
-  def hex_to_micheline("07" <> rest) do
-    tot_consumed = 2
-
-    {kw, consumed} = code_to_kw(rest)
-    tot_consumed = consumed + tot_consumed
-    <<_consumed::binary-size(consumed), rest::binary>> = rest
-
-    {arg1, consumed} = hex_to_micheline(rest)
-    tot_consumed = consumed + tot_consumed
-    <<_consumed::binary-size(consumed), rest::binary>> = rest
-
-    {arg2, consumed} = hex_to_micheline(rest)
-    tot_consumed = consumed + tot_consumed
-
-    {%{prim: kw, args: [arg1, arg2]}, tot_consumed}
-  end
-
-  # primitive / 2 arg / annot
-  def hex_to_micheline("08" <> rest) do
-    tot_consumed = 2
-
-    {kw, consumed} = code_to_kw(rest)
-    tot_consumed = consumed + tot_consumed
-    <<_consumed::binary-size(consumed), rest::binary>> = rest
-
-    {arg1, consumed} = hex_to_micheline(rest)
-    tot_consumed = consumed + tot_consumed
-    <<_consumed::binary-size(consumed), rest::binary>> = rest
-
-    {arg2, consumed} = hex_to_micheline(rest)
-    tot_consumed = consumed + tot_consumed
-    <<_consumed::binary-size(consumed), rest::binary>> = rest
-
-    {annot, consumed} = micheline_hex_to_string(rest)
-    tot_consumed = consumed + tot_consumed
-
-    {%{prim: kw, args: [arg1, arg2], annots: decode_annotations(annot)}, tot_consumed}
-  end
-
-  # primitive / N arg / maybe annot
-  def hex_to_micheline("09" <> rest) do
-    tot_consumed = 2
-
-    {kw, consumed} = code_to_kw(rest)
-    tot_consumed = consumed + tot_consumed
-    <<_consumed::binary-size(consumed), rest::binary>> = rest
-
-    {args, consumed} = hex_to_micheline("02" <> rest)
-    # -2 to factor out the "02" we just added
-    consumed = consumed - 2
-    tot_consumed = consumed + tot_consumed
-    <<_consumed::binary-size(consumed), rest::binary>> = rest
-
-    case rest do
-      # no annotation to parse
-      <<"00000000", _rest::binary>> ->
-        {%{prim: kw, args: args}, tot_consumed + 8}
-
-      _ ->
-        {annot, consumed} = micheline_hex_to_string(rest)
-        tot_consumed = consumed + tot_consumed
-        {%{prim: kw, args: args, annots: decode_annotations(annot)}, tot_consumed}
+      nil ->
+        "05" <> :binary.encode_hex(Forge.forge_micheline(value), :lowercase)
     end
   end
 
-  # raw bytes
-  def hex_to_micheline(<<"0a", rest::binary>>) do
-    {bytes, length} = micheline_hex_to_string(rest)
-    {%{bytes: bytes}, length + 2}
-  end
-
-  @spec micheline_hex_to_string(binary()) :: {binary(), pos_integer()}
-  def micheline_hex_to_string(<<length::binary-size(8), rest::binary>>) do
-    length = hex_to_dec(length) * 2
-    <<text::binary-size(length), _rest::binary>> = rest
-    {text, length + 8}
-  end
-
+  @spec unpack(binary(), pack_types()) :: binary() | integer() | map()
+  @spec unpack(binary()) :: binary() | integer() | map()
   @doc """
-  Encode a string to its Micheline representation:
-  * `"05"` to indicate that it is a Micheline expression
-  * `"01"` to indicate that it is a Micheline string
-  * byte size encoded on 4 bytes
-  * hex representation of the string
-  """
-  @spec string_to_micheline_hex(binary()) :: binary()
-  def string_to_micheline_hex(bytes) do
-    hex_bytes = :binary.encode_hex(bytes)
-    padded_bytes_size = String.pad_leading("#{trunc(byte_size(hex_bytes) / 2)}", 8, "0")
-
-    "0501" <> padded_bytes_size <> hex_bytes
-  end
-
-  @doc """
-  Decode optimized Micheline representation of an address value
+  Deserialize a piece of data from its optimized binary representation.
 
   ## Examples
-      iex> Tezex.Micheline.decode_optimized_address("00007fc95c97fd368cd9055610ee79e64ff9e0b5285c")
-      {:ok, "tz1XHhjLXQuG9rf9n7o1VbgegMkiggy1oktu"}
-      iex> Tezex.Micheline.decode_optimized_address("10007fc95c97fd368cd9055610ee79e64ff9e0b5285c")
-      {:error, :invalid}
+      iex> Micheline.unpack("050a0000001601e67bac124dff100a57644de0cf26d341ebf9492600", :address)
+      "KT1VbT8n6YbrzPSjdAscKfJGDDNafB5yHn1H"
+      iex> Micheline.unpack("0507070001000c")
+      %{"prim" => "Pair", "args" => [%{"int" => "1"}, %{"int" => "12"}]}
   """
-  @spec decode_optimized_address(binary()) :: {:error, :invalid} | {:ok, nonempty_binary()}
-  def decode_optimized_address(hex) do
-    {prefix, pkh} =
-      case :binary.decode_hex(hex) do
-        <<0, 0, pkh::binary-size(20)>> -> {<<6, 161, 159>>, pkh}
-        <<0, 1, pkh::binary-size(20)>> -> {<<6, 161, 161>>, pkh}
-        <<0, 2, pkh::binary-size(20)>> -> {<<6, 161, 164>>, pkh}
-        <<1, pkh::binary-size(20), 0>> -> {<<2, 90, 121>>, pkh}
-        _ -> {:error, :invalid}
-      end
+  def unpack(hex_value, type \\ nil) do
+    case type do
+      :int ->
+        hex_value
+        |> binary_slice(4..-1//1)
+        |> :binary.decode_hex()
+        |> Forge.unforge_int()
+        |> elem(0)
 
-    case {prefix, pkh} do
-      {:error, :invalid} -> {:error, :invalid}
-      {prefix, pkh} -> {:ok, Tezex.Crypto.Base58Check.encode(pkh, prefix)}
+      :nat ->
+        hex_value
+        |> binary_slice(4..-1//1)
+        |> :binary.decode_hex()
+        |> Forge.unforge_int()
+        |> elem(0)
+
+      :string ->
+        hex_value
+        |> binary_slice(12..-1//1)
+        |> :binary.decode_hex()
+
+      :bytes ->
+        hex_value
+        |> binary_slice(12..-1//1)
+
+      :key_hash ->
+        ("00" <> binary_slice(hex_value, 12..-1//1))
+        |> :binary.decode_hex()
+        |> Forge.unforge_address()
+
+      :address ->
+        hex_value
+        |> binary_slice(12..-1//1)
+        |> :binary.decode_hex()
+        |> Forge.unforge_address()
+
+      nil ->
+        hex_value
+        |> binary_slice(2..-1//1)
+        |> :binary.decode_hex()
+        |> Forge.unforge_micheline()
     end
   end
 
-  defp code_to_kw(code) when is_integer(code) do
-    {Enum.at(@kw, code), 2}
-  end
-
-  defp code_to_kw(<<code::binary-size(2), _rest::binary>>) when is_binary(code) do
-    {d, _} = Integer.parse(code, 16)
-    code_to_kw(d)
-  end
-
-  defp decode_annotations(annots_hex) do
-    annots_hex
-    |> :binary.decode_hex()
-    |> String.split(" ")
-  end
-
-  defp hex_to_dec(hex) do
-    {d, ""} = Integer.parse(hex, 16)
-    d
-  end
-
-  defp read_sequence(to_read, consumed, length, acc) when consumed < length do
-    {content, l} = hex_to_micheline(to_read)
-    <<_consumed::binary-size(l), to_read::binary>> = to_read
-    read_sequence(to_read, consumed + l, length, [content | acc])
-  end
-
-  defp read_sequence(_to_read, consumed, _length, acc) do
-    {acc, consumed}
+  defp encode_byte_size(bytes) do
+    (byte_size(bytes) / 2)
+    |> trunc()
+    |> Integer.to_string(16)
+    |> String.pad_leading(8, "0")
   end
 end

@@ -56,4 +56,7 @@ defmodule Tezex.Crypto.Base58Check do
   """
   @spec decode58!(binary) :: binary
   defdelegate decode58!(encoded), to: Base58Check
+
+  @spec decode58check!(binary) :: binary
+  defdelegate decode58check!(encoded), to: Base58Check
 end

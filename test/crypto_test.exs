@@ -358,7 +358,7 @@ defmodule Tezex.CryptoTest do
 
   defp sign_and_verify(encoded_private_key, pubkey) do
     msg = "aaøfË"
-    msg = Micheline.string_to_micheline_hex(msg)
+    msg = Micheline.pack(msg, :string)
 
     signature = Crypto.sign_message(encoded_private_key, msg)
     Crypto.verify_signature(signature, msg, pubkey)
