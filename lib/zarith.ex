@@ -1,4 +1,4 @@
-defmodule Tezex.Micheline.Zarith do
+defmodule Tezex.Zarith do
   @moduledoc """
   A Zarith number is an integer encoded as a variable length sequence of bytes.
 
@@ -14,16 +14,16 @@ defmodule Tezex.Micheline.Zarith do
   Takes a binary and returns the integer in base 10.
 
   ## Examples
-      iex> Tezex.Micheline.Zarith.decode("00a1d22c")
+      iex> Tezex.Zarith.decode("a1d22c")
       365_729
 
-      iex> Tezex.Micheline.Zarith.decode("00e1d22c")
+      iex> Tezex.Zarith.decode("e1d22c")
       -365_729
   """
   @spec decode(nonempty_binary()) :: integer()
   def decode(binary_input) when is_binary(binary_input) do
     {%{int: integer}, _} = consume(binary_input)
-    integer
+    String.to_integer(integer)
   end
 
   @doc """
@@ -33,10 +33,10 @@ defmodule Tezex.Micheline.Zarith do
   Implementation based on [anchorageoss/tezosprotocol (MIT License - Copyright (c) 2019 Anchor Labs, Inc.)](https://github.com/anchorageoss/tezosprotocol/blob/23a051d34fcfda8393940141f8151113a1aca10b/zarith/zarith.go#L153)
 
   ## Examples
-      iex> Tezex.Micheline.Zarith.encode(365_729)
+      iex> Tezex.Zarith.encode(365_729)
       "a1d22c"
 
-      iex> Tezex.Micheline.Zarith.encode(-365_729)
+      iex> Tezex.Zarith.encode(-365_729)
       "e1d22c"
   """
   @spec encode(integer()) :: nonempty_binary()
@@ -108,7 +108,7 @@ defmodule Tezex.Micheline.Zarith do
   Takes a binary and returns the decoded integer in base 10 along with how many characters of the input binary
   were used to decode the integer.
   """
-  @spec consume(nonempty_binary()) :: {%{int: integer()}, pos_integer()}
+  @spec consume(nonempty_binary()) :: {%{int: binary()}, pos_integer()}
   def consume(binary_input) when is_binary(binary_input) do
     {carved_int, rest} = find_int(binary_input)
 
@@ -128,14 +128,20 @@ defmodule Tezex.Micheline.Zarith do
     {integer, consumed}
   end
 
-  defp find_int(<<n::bitstring-size(16), rest::bitstring>>, acc \\ []) do
+  defp find_int(_bin, _acc \\ [])
+
+  defp find_int(<<n::bitstring-size(16), rest::bitstring>>, acc) do
     dec = hex_to_dec(n)
 
-    if dec != 0 and dec < 128 do
+    if dec < 128 do
       {Enum.reverse([n | acc]) |> Enum.join(""), rest}
     else
       find_int(rest, [n | acc])
     end
+  end
+
+  defp find_int("", acc) do
+    {Enum.reverse(acc) |> Enum.join(""), ""}
   end
 
   defp read([<<_halt::1, sign::1, tail::integer-size(6)>> | rest]) do
@@ -148,8 +154,8 @@ defmodule Tezex.Micheline.Zarith do
     <<integer::integer-size(bits_count)>> = bits
 
     case sign do
-      1 -> %{int: -integer}
-      0 -> %{int: integer}
+      1 -> %{int: "-#{integer}"}
+      0 -> %{int: "#{integer}"}
     end
   end
 
@@ -173,5 +179,12 @@ defmodule Tezex.Micheline.Zarith do
   defp dec_to_hex(dec) do
     Integer.to_string(dec, 16)
     |> String.downcase()
+    |> then(fn hex ->
+      if rem(byte_size(hex), 2) == 1 do
+        "0" <> hex
+      else
+        hex
+      end
+    end)
   end
 end

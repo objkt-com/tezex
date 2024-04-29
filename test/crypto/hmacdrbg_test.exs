@@ -1,6 +1,6 @@
 defmodule Tezex.Crypto.HMACDRBGTest do
   alias Tezex.Crypto.HMACDRBG
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   test "test sha256 1" do
     entropy = "totally random0123456789"

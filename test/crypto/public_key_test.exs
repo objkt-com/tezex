@@ -1,5 +1,5 @@
 defmodule Tezex.Crypto.PublicKeyTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   alias Tezex.Crypto.PrivateKey
   alias Tezex.Crypto.PublicKey
