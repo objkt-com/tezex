@@ -1,5 +1,7 @@
 defmodule Tezex.Forge do
   @moduledoc """
+  Convert Tezos Micheline data from/to binary form for injection into the Tezos blockchain (aka forging/unforging Micheline).
+
   Mostly ported from pytezos@9352c4579e436b92f8070343964af20747255197
   > pytezos / MIT License / (c) 2020 Baking Bad / (c) 2018 Arthur Breitman
   """
@@ -8,6 +10,8 @@ defmodule Tezex.Forge do
 
   alias Tezex.Crypto.Base58Check
   alias Tezex.Zarith
+
+  @type io_encoding :: :bytes | :hex
 
   @base58_encodings [
     # block hash
@@ -122,8 +126,9 @@ defmodule Tezex.Forge do
   @doc """
   Encode a signed unbounded integer into byte form.
   """
+  @spec forge_int(integer(), io_encoding()) :: nonempty_binary()
   @spec forge_int(integer()) :: nonempty_binary()
-  def forge_int(value) when is_integer(value) do
+  def forge_int(value, output_encoding \\ :bytes) when is_integer(value) do
     bin = Zarith.encode(value)
 
     if rem(byte_size(bin), 2) == 1 do
@@ -132,21 +137,30 @@ defmodule Tezex.Forge do
       bin
     end
     |> :binary.decode_hex()
+    |> encode_output(output_encoding)
   end
 
-  def forge_int16(value) do
+  @spec forge_int16(integer(), io_encoding()) :: nonempty_binary()
+  @spec forge_int16(integer()) :: nonempty_binary()
+  def forge_int16(value, output_encoding \\ :bytes) do
     <<value::size(16)>>
+    |> encode_output(output_encoding)
   end
 
-  def forge_int32(value) do
+  @spec forge_int32(integer(), io_encoding()) :: nonempty_binary()
+  @spec forge_int32(integer()) :: nonempty_binary()
+  def forge_int32(value, output_encoding \\ :bytes) do
     <<value::size(32)>>
+    |> encode_output(output_encoding)
   end
 
   @doc """
   Decode a signed unbounded integer from bytes.
   """
-  @spec unforge_int(binary()) :: {integer(), integer()}
-  def unforge_int(data) do
+  @spec unforge_int(binary(), io_encoding()) :: {integer(), non_neg_integer()}
+  @spec unforge_int(binary()) :: {integer(), non_neg_integer()}
+  def unforge_int(data, input_encoding \\ :bytes) do
+    data = decode_input(data, input_encoding)
     {%{int: bin}, n} = Zarith.consume(:binary.encode_hex(data))
     {String.to_integer(bin), div(n, 2)}
   end
@@ -154,13 +168,15 @@ defmodule Tezex.Forge do
   @doc """
   Encode a non-negative integer using LEB128 encoding.
   """
+  @spec forge_nat(non_neg_integer(), io_encoding()) :: nonempty_binary()
   @spec forge_nat(non_neg_integer()) :: nonempty_binary()
-  def forge_nat(value) do
+  def forge_nat(value, output_encoding \\ :bytes) do
     if value < 0 do
       raise ArgumentError, "Value cannot be negative."
     end
 
     forge_nat_recursive(value)
+    |> encode_output(output_encoding)
   end
 
   defp forge_nat_recursive(value, acc \\ <<>>) do
@@ -174,22 +190,30 @@ defmodule Tezex.Forge do
     end
   end
 
+  @spec unforge_chain_id(binary(), io_encoding()) :: nonempty_binary()
   @spec unforge_chain_id(binary()) :: nonempty_binary()
-  def unforge_chain_id(data) do
+  def unforge_chain_id(data, input_encoding \\ :bytes) do
+    data = decode_input(data, input_encoding)
     encode_with_prefix(data, "Net")
   end
 
+  @spec unforge_signature(binary(), io_encoding()) :: nonempty_binary()
   @spec unforge_signature(binary()) :: nonempty_binary()
-  def unforge_signature(data) do
+  def unforge_signature(data, input_encoding \\ :bytes) do
+    data = decode_input(data, input_encoding)
     encode_with_prefix(data, "sig")
   end
 
-  def forge_bool(value) do
-    if value, do: <<255>>, else: <<0>>
+  @spec forge_bool(boolean(), io_encoding()) :: nonempty_binary()
+  @spec forge_bool(boolean()) :: nonempty_binary()
+  def forge_bool(value, output_encoding \\ :bytes) do
+    if(value, do: <<255>>, else: <<0>>)
+    |> encode_output(output_encoding)
   end
 
+  @spec forge_base58(binary(), io_encoding()) :: binary()
   @spec forge_base58(binary()) :: binary()
-  def forge_base58(value) do
+  def forge_base58(value, output_encoding \\ :bytes) do
     prefix_len =
       Enum.find_value(@base58_encodings, fn m ->
         if byte_size(value) == m.e_len and String.starts_with?(value, m.e_prefix) do
@@ -205,8 +229,10 @@ defmodule Tezex.Forge do
 
     Base58Check.decode58!(value)
     |> binary_slice(prefix_len, 32)
+    |> encode_output(output_encoding)
   end
 
+  @spec optimize_timestamp(binary()) :: integer()
   def optimize_timestamp(value) when is_binary(value) do
     case DateTime.from_iso8601(value) do
       {:ok, datetime, 0} -> DateTime.to_unix(datetime)
@@ -217,13 +243,14 @@ defmodule Tezex.Forge do
   @doc """
   Encode address or key hash into bytes.
 
-  ## Parameters
-    - `value`: base58 encoded address or key_hash
-    - `tz_only`: True indicates that it's a key_hash (will be encoded in a more compact form)
+  - `value` is a base58 encoded address or key_hash
+  - `tz_only` indicates that it's a key_hash (will be encoded in a more compact form)
   """
-  @spec forge_address(binary(), boolean()) :: nonempty_binary()
+  @spec forge_address(binary(), io_encoding(), boolean()) :: nonempty_binary()
+  @spec forge_address(binary(), io_encoding()) :: nonempty_binary()
   @spec forge_address(binary()) :: nonempty_binary()
-  def forge_address(value, tz_only \\ false) do
+  def forge_address(value, output_encoding \\ :bytes, tz_only \\ false)
+      when is_boolean(tz_only) and is_atom(output_encoding) do
     prefix_len = if String.starts_with?(value, "txr1"), do: 4, else: 3
     prefix = binary_part(value, 0, prefix_len)
 
@@ -248,10 +275,14 @@ defmodule Tezex.Forge do
         res
       end
     end)
+    |> encode_output(output_encoding)
   end
 
+  @spec unforge_address(binary(), io_encoding()) :: nonempty_binary()
   @spec unforge_address(binary()) :: nonempty_binary()
-  def unforge_address(data) do
+  def unforge_address(data, input_encoding \\ :bytes) do
+    data = decode_input(data, input_encoding)
+
     tz_prefixes = %{
       <<0, 0>> => "tz1",
       <<0, 1>> => "tz2",
@@ -287,8 +318,9 @@ defmodule Tezex.Forge do
     encode_with_prefix(data, prefix)
   end
 
+  @spec forge_contract(binary(), io_encoding()) :: binary()
   @spec forge_contract(binary()) :: binary()
-  def forge_contract(value) do
+  def forge_contract(value, output_encoding \\ :bytes) do
     [address, entrypoint] = String.split(value, "%", parts: 2)
     address_bytes = forge_address(address)
 
@@ -297,19 +329,16 @@ defmodule Tezex.Forge do
     else
       address_bytes
     end
+    |> encode_output(output_encoding)
   end
 
   @doc """
-  Decode a contract (address + optional entrypoint) from bytes.
-
-  ## Parameters
-    - `data`: The binary containing the encoded contract.
-
-  ## Returns
-    - A string with the base58 encoded address and, if present, the entrypoint separated by `%`.
+  Decode a contract (address + optional entrypoint) from bytes, returning a string with the base58 encoded address and, if present, the entrypoint separated by `%`.
   """
+  @spec unforge_contract(binary(), io_encoding()) :: nonempty_binary()
   @spec unforge_contract(binary()) :: nonempty_binary()
-  def unforge_contract(data) do
+  def unforge_contract(data, input_encoding \\ :bytes) do
+    data = decode_input(data, input_encoding)
     address = unforge_address(binary_part(data, 0, 22))
 
     case byte_size(data) > 22 do
@@ -322,8 +351,9 @@ defmodule Tezex.Forge do
     end
   end
 
+  @spec forge_public_key(binary(), io_encoding()) :: nonempty_binary()
   @spec forge_public_key(binary()) :: nonempty_binary()
-  def forge_public_key(value) do
+  def forge_public_key(value, output_encoding \\ :bytes) do
     {:ok, res} = Tezex.Crypto.extract_pubkey(value)
     prefix = binary_part(value, 0, 4)
 
@@ -333,10 +363,14 @@ defmodule Tezex.Forge do
       "p2pk" -> <<2>> <> res
       _ -> raise "Unrecognized key type: #{prefix}"
     end
+    |> encode_output(output_encoding)
   end
 
+  @spec unforge_public_key(binary(), io_encoding()) :: nonempty_binary()
   @spec unforge_public_key(binary()) :: nonempty_binary()
-  def unforge_public_key(data) do
+  def unforge_public_key(data, input_encoding \\ :bytes) do
+    data = decode_input(data, input_encoding)
+
     key_prefix =
       %{
         <<0>> => <<13, 15, 37, 217>>,
@@ -348,27 +382,20 @@ defmodule Tezex.Forge do
     Base58Check.encode(binary_part(data, 1, byte_size(data) - 1), prefix)
   end
 
-  @spec forge_array(binary(), non_neg_integer()) :: binary()
+  @spec forge_array(binary(), io_encoding(), non_neg_integer()) :: binary()
+  @spec forge_array(binary(), io_encoding()) :: binary()
   @spec forge_array(binary()) :: binary()
-  def forge_array(data, len_bytes \\ 4) do
-    <<byte_size(data)::size(len_bytes * 8)>> <> data
+  def forge_array(data, output_encoding \\ :bytes, len_bytes \\ 4) do
+    (<<byte_size(data)::size(len_bytes * 8)>> <> data)
+    |> encode_output(output_encoding)
   end
 
-  @doc """
-  Decodes an encoded array of bytes.
-
-  ## Parameters
-
-    - `data` - The encoded array as a binary.
-    - `len_bytes` - The number of bytes that store the array length.
-
-  ## Returns
-
-  A tuple with the list of bytes and the total length of the array extracted.
-  """
-  @spec unforge_array(binary(), non_neg_integer()) :: {binary(), non_neg_integer()}
+  @spec unforge_array(binary(), io_encoding(), non_neg_integer()) :: {binary(), non_neg_integer()}
+  @spec unforge_array(binary(), io_encoding()) :: {binary(), non_neg_integer()}
   @spec unforge_array(binary()) :: {binary(), non_neg_integer()}
-  def unforge_array(data, len_bytes \\ 4) do
+  def unforge_array(data, input_encoding \\ :bytes, len_bytes \\ 4) do
+    data = decode_input(data, input_encoding)
+
     if byte_size(data) < len_bytes do
       throw("not enough bytes to parse array length, wanted #{len_bytes}")
     end
@@ -385,24 +412,22 @@ defmodule Tezex.Forge do
 
   @doc """
   Encode a Micheline expression into byte form.
-
-  ## Parameters
-    - `data`: The Micheline expression, which can be a list or map.
-
-  ## Returns
-    - The encoded Micheline expression as binary data.
   """
+  @spec forge_micheline(list() | map(), io_encoding()) :: binary()
   @spec forge_micheline(list() | map()) :: binary()
-  def forge_micheline(data) when is_list(data) do
+  def forge_micheline(data, output_encoding \\ :bytes)
+
+  def forge_micheline(data, output_encoding) when is_list(data) do
     # Handle encoding of list data
     data =
       Enum.map(data, &forge_micheline/1)
       |> Enum.join("")
 
-    <<2>> <> forge_array(data)
+    (<<2>> <> forge_array(data))
+    |> encode_output(output_encoding)
   end
 
-  def forge_micheline(data) when is_map(data) do
+  def forge_micheline(data, output_encoding) when is_map(data) do
     # Handle encoding of map (dictionary) data
     cond do
       Map.has_key?(data, "prim") ->
@@ -446,23 +471,20 @@ defmodule Tezex.Forge do
         raise "Unsupported data format: #{inspect(data)}"
     end
     |> IO.iodata_to_binary()
+    |> encode_output(output_encoding)
   end
 
-  def forge_micheline(_data) do
+  def forge_micheline(_data, _) do
     raise "Unsupported data type"
   end
 
   @doc """
   Parse Micheline map from bytes.
-
-  ## Parameters
-    - `data`: The binary containing the forged Micheline expression.
-
-  ## Returns
-    - The Micheline map parsed from the bytes.
   """
+  @spec unforge_micheline(binary(), io_encoding()) :: list() | map()
   @spec unforge_micheline(binary()) :: list() | map()
-  def unforge_micheline(data) do
+  def unforge_micheline(data, input_encoding \\ :bytes) do
+    data = decode_input(data, input_encoding)
     {result, _ptr} = do_unforge_micheline(data, 0)
     result
   end
@@ -573,18 +595,23 @@ defmodule Tezex.Forge do
     end
   end
 
+  @spec forge_script(map(), io_encoding()) :: binary()
   @spec forge_script(map()) :: binary()
-  def forge_script(script) do
+  def forge_script(script, output_encoding \\ :bytes) do
     code = forge_micheline(script["code"])
     storage = forge_micheline(script["storage"])
-    forge_array(code) <> forge_array(storage)
+
+    (forge_array(code) <> forge_array(storage))
+    |> encode_output(output_encoding)
   end
 
+  @spec forge_script_expr(binary(), io_encoding()) :: nonempty_binary()
   @spec forge_script_expr(binary()) :: nonempty_binary()
-  def forge_script_expr(packed_key) do
+  def forge_script_expr(packed_key, output_encoding \\ :bytes) do
     data = Blake2.hash2b(packed_key, 32)
 
     Base58Check.encode(data, <<13, 44, 64, 27>>)
+    |> encode_output(output_encoding)
   end
 
   defp encode_with_prefix(data, e_prefix) do
@@ -596,4 +623,12 @@ defmodule Tezex.Forge do
 
     Base58Check.encode(data, prefix.d_prefix)
   end
+
+  @spec decode_input(binary(), io_encoding()) :: binary()
+  defp decode_input(data, :bytes), do: data
+  defp decode_input(data, :hex), do: :binary.decode_hex(data)
+
+  @spec encode_output(binary(), io_encoding()) :: binary()
+  defp encode_output(data, :bytes), do: data
+  defp encode_output(data, :hex), do: :binary.encode_hex(data, :lowercase)
 end

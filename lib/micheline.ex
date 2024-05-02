@@ -1,10 +1,12 @@
 defmodule Tezex.Micheline do
+  @moduledoc """
+  Serialize/deserialize data to/from Tezos Micheline optimized binary representation.
+  """
   alias Tezex.Forge
   alias Tezex.Zarith
 
-  @typep pack_types :: nil | :address | :bytes | :int | :key_hash | :nat | :string
-  @spec pack(binary() | integer() | map(), pack_types()) :: nonempty_binary()
-  @spec pack(binary() | integer() | map()) :: nonempty_binary()
+  @type pack_types :: nil | :address | :bytes | :int | :key_hash | :nat | :string
+
   @doc """
   Serialize a piece of data to its optimized binary representation.
 
@@ -14,6 +16,8 @@ defmodule Tezex.Micheline do
       iex> Micheline.pack(%{"prim" => "Pair", "args" => [%{"int" => "-33"}, %{"int" => "71"}]})
       "0507070061008701"
   """
+  @spec pack(binary() | integer() | map(), pack_types()) :: nonempty_binary()
+  @spec pack(binary() | integer() | map()) :: nonempty_binary()
   def pack(value, type \\ nil) do
     case type do
       :int ->
@@ -31,20 +35,18 @@ defmodule Tezex.Micheline do
         "050a#{encode_byte_size(hex_bytes)}#{hex_bytes}"
 
       :key_hash ->
-        address = :binary.encode_hex(Forge.forge_address(value), :lowercase)
+        address = Forge.forge_address(value, :hex)
         "050a#{encode_byte_size(address)}#{address}"
 
       :address ->
-        address = :binary.encode_hex(Forge.forge_address(value), :lowercase)
+        address = Forge.forge_address(value, :hex)
         "050a#{encode_byte_size(address)}#{address}"
 
       nil ->
-        "05" <> :binary.encode_hex(Forge.forge_micheline(value), :lowercase)
+        "05" <> Forge.forge_micheline(value, :hex)
     end
   end
 
-  @spec unpack(binary(), pack_types()) :: binary() | integer() | map()
-  @spec unpack(binary()) :: binary() | integer() | map()
   @doc """
   Deserialize a piece of data from its optimized binary representation.
 
@@ -54,20 +56,21 @@ defmodule Tezex.Micheline do
       iex> Micheline.unpack("0507070001000c")
       %{"prim" => "Pair", "args" => [%{"int" => "1"}, %{"int" => "12"}]}
   """
+  @type unpack_result :: binary() | integer() | map() | list(unpack_result())
+  @spec unpack(binary(), pack_types()) :: unpack_result()
+  @spec unpack(binary()) :: unpack_result()
   def unpack(hex_value, type \\ nil) do
     case type do
       :int ->
         hex_value
         |> binary_slice(4..-1//1)
-        |> :binary.decode_hex()
-        |> Forge.unforge_int()
+        |> Forge.unforge_int(:hex)
         |> elem(0)
 
       :nat ->
         hex_value
         |> binary_slice(4..-1//1)
-        |> :binary.decode_hex()
-        |> Forge.unforge_int()
+        |> Forge.unforge_int(:hex)
         |> elem(0)
 
       :string ->
@@ -81,20 +84,17 @@ defmodule Tezex.Micheline do
 
       :key_hash ->
         ("00" <> binary_slice(hex_value, 12..-1//1))
-        |> :binary.decode_hex()
-        |> Forge.unforge_address()
+        |> Forge.unforge_address(:hex)
 
       :address ->
         hex_value
         |> binary_slice(12..-1//1)
-        |> :binary.decode_hex()
-        |> Forge.unforge_address()
+        |> Forge.unforge_address(:hex)
 
       nil ->
         hex_value
         |> binary_slice(2..-1//1)
-        |> :binary.decode_hex()
-        |> Forge.unforge_micheline()
+        |> Forge.unforge_micheline(:hex)
     end
   end
 

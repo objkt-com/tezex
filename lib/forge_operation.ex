@@ -1,5 +1,7 @@
 defmodule Tezex.ForgeOperation do
   @moduledoc """
+  Prepare an operation or an operation group for injection into the Tezos blockchain.
+
   Mostly ported from pytezos@9352c4579e436b92f8070343964af20747255197
   > pytezos / MIT License / (c) 2020 Baking Bad / (c) 2018 Arthur Breitman
   """
@@ -46,7 +48,7 @@ defmodule Tezex.ForgeOperation do
 
   def forge_entrypoint(entrypoint) do
     case Map.get(@reserved_entrypoints, entrypoint) do
-      nil -> <<255>> <> Forge.forge_array(entrypoint, 1)
+      nil -> <<255>> <> Forge.forge_array(entrypoint, :bytes, 1)
       code -> code
     end
   end
@@ -105,7 +107,7 @@ defmodule Tezex.ForgeOperation do
   def forge_reveal(content) do
     [
       forge_tag(@operation_tags[content["kind"]]),
-      Forge.forge_address(content["source"], true),
+      Forge.forge_address(content["source"], :bytes, true),
       Forge.forge_nat(String.to_integer(content["fee"])),
       Forge.forge_nat(String.to_integer(content["counter"])),
       Forge.forge_nat(String.to_integer(content["gas_limit"])),
@@ -119,7 +121,7 @@ defmodule Tezex.ForgeOperation do
   def forge_transaction(content) do
     [
       forge_tag(@operation_tags[content["kind"]]),
-      Forge.forge_address(content["source"], true),
+      Forge.forge_address(content["source"], :bytes, true),
       Forge.forge_nat(String.to_integer(content["fee"])),
       Forge.forge_nat(String.to_integer(content["counter"])),
       Forge.forge_nat(String.to_integer(content["gas_limit"])),
@@ -145,7 +147,7 @@ defmodule Tezex.ForgeOperation do
   def forge_origination(content) do
     [
       forge_tag(@operation_tags[content["kind"]]),
-      Forge.forge_address(content["source"], true),
+      Forge.forge_address(content["source"], :bytes, true),
       Forge.forge_nat(String.to_integer(content["fee"])),
       Forge.forge_nat(String.to_integer(content["counter"])),
       Forge.forge_nat(String.to_integer(content["gas_limit"])),
@@ -157,7 +159,7 @@ defmodule Tezex.ForgeOperation do
 
         delegate ->
           Forge.forge_bool(true) <>
-            Forge.forge_address(delegate, true)
+            Forge.forge_address(delegate, :bytes, true)
       end,
       Forge.forge_script(content["script"])
     ]
@@ -168,7 +170,7 @@ defmodule Tezex.ForgeOperation do
   def forge_delegation(content) do
     [
       forge_tag(@operation_tags[content["kind"]]),
-      Forge.forge_address(content["source"], true),
+      Forge.forge_address(content["source"], :bytes, true),
       Forge.forge_nat(String.to_integer(content["fee"])),
       Forge.forge_nat(String.to_integer(content["counter"])),
       Forge.forge_nat(String.to_integer(content["gas_limit"])),
@@ -178,7 +180,7 @@ defmodule Tezex.ForgeOperation do
           Forge.forge_bool(false)
 
         delegate ->
-          [Forge.forge_bool(true), Forge.forge_address(delegate, true)]
+          [Forge.forge_bool(true), Forge.forge_address(delegate, :bytes, true)]
       end
     ]
     |> IO.iodata_to_binary()
@@ -220,7 +222,7 @@ defmodule Tezex.ForgeOperation do
   def forge_register_global_constant(content) do
     [
       forge_tag(@operation_tags[content["kind"]]),
-      Forge.forge_address(content["source"], true),
+      Forge.forge_address(content["source"], :bytes, true),
       Forge.forge_nat(String.to_integer(content["fee"])),
       Forge.forge_nat(String.to_integer(content["counter"])),
       Forge.forge_nat(String.to_integer(content["gas_limit"])),
@@ -234,7 +236,7 @@ defmodule Tezex.ForgeOperation do
   def forge_transfer_ticket(content) do
     [
       forge_tag(@operation_tags[content["kind"]]),
-      Forge.forge_address(content["source"], true),
+      Forge.forge_address(content["source"], :bytes, true),
       Forge.forge_nat(String.to_integer(content["fee"])),
       Forge.forge_nat(String.to_integer(content["counter"])),
       Forge.forge_nat(String.to_integer(content["gas_limit"])),
@@ -253,7 +255,7 @@ defmodule Tezex.ForgeOperation do
   def forge_smart_rollup_add_messages(content) do
     [
       forge_tag(@operation_tags[content["kind"]]),
-      Forge.forge_address(content["source"], true),
+      Forge.forge_address(content["source"], :bytes, true),
       Forge.forge_nat(String.to_integer(content["fee"])),
       Forge.forge_nat(String.to_integer(content["counter"])),
       Forge.forge_nat(String.to_integer(content["gas_limit"])),
@@ -272,7 +274,7 @@ defmodule Tezex.ForgeOperation do
   def forge_smart_rollup_execute_outbox_message(content) do
     [
       forge_tag(@operation_tags[content["kind"]]),
-      Forge.forge_address(content["source"], true),
+      Forge.forge_address(content["source"], :bytes, true),
       Forge.forge_nat(String.to_integer(content["fee"])),
       Forge.forge_nat(String.to_integer(content["counter"])),
       Forge.forge_nat(String.to_integer(content["gas_limit"])),
