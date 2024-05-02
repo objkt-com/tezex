@@ -239,7 +239,7 @@ defmodule Tezex.CryptoTest do
       watermark = <<3>>
 
       signature =
-        "sigeeho3jK4MZKsyqcTc9mjhtz9w6enG3AFniufgUXCuXFW7VjShxLoNmxqkQSRYUwP1LHRMere5LrvxcqLgU9KmDGN356Yz"
+        "edsigtpUAv6xDLHkMwApubdzxh1BVvmBaktukdUUeQ2UWDFYCowSKwbsRtS1stM2EX1fHpYouLsSDUhJdfkf2zpp7WpHNGqphui"
 
       assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
       assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
@@ -259,7 +259,7 @@ defmodule Tezex.CryptoTest do
       watermark = <<3>>
 
       signature =
-        "sigpKAnfQGzG4Rk5pV7z9mx2TL9veQCHD7qN4PhsUZMj1BqsumBoApBS9Ue616vKVymxrzfZE2L4h27zzxRUVy6BNPRMpufb"
+        "edsigtz8duidBGCFToGonG1zxuKjqvkjLAv5iD3p8SDUYN5299hrMgh5uGVPPggcu1ngLDWLcb51PAgenro3A5cqwHESVJ31m4x"
 
       assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
       assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
@@ -278,7 +278,7 @@ defmodule Tezex.CryptoTest do
       watermark = <<3>>
 
       signature =
-        "sigREwM1SuRN5WzjH5xGJuyeZQ9kWi8XtbA4wRqGTumJwNY18PmF1XQMLCXEQBr4frnriKHWdPUynF1vGUvPcoWrNjb3s5xp"
+        "spsig194cg549ti3fNuGqvQs4dZEn4aJHCbXHde4kc4dDaCs5y4nCwp5uMUp4DbyGuTjisaTU2UV1v7vy7CybSGJJS4ur88uBWT"
 
       assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
       assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
@@ -295,7 +295,7 @@ defmodule Tezex.CryptoTest do
       watermark = <<3>>
 
       signature =
-        "sigmVKa3AcvzDTPGD7rJXkrMh8XMVkVQUkLwGLL3h1APWgicRKBmgjZ3624vqHA2FufBrLTQuPS9YBN1h2Z16kexp9F8NRXp"
+        "spsig1VJzu6msQLBbmSCspT5uWGNWSBHKZU7SpWPf6qrJyHSQ9g58NLm7WAZsmJQNDRKmjubVCNm1sHguTJQ94snFaBMFkDWskF"
 
       assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
       assert signature == Crypto.sign(encoded_private_key, bytes, watermark)
@@ -312,7 +312,7 @@ defmodule Tezex.CryptoTest do
       watermark = <<3>>
 
       signature =
-        "sigRUobRZ4oG7CvdtQfNoDe3Gqn8zrLw6RXjXVa84rX3HMzWuCuncWgDqY8wRkssofLUsfbdR6MNGJzDWaNXEwTxDktfrKmj"
+        "p2sigQo2SWectj3FPa9Av6PkRYjdAXf5c2WqkBJLxXXHpFjeY4AzEAfbuW1xS8NH7K1Ef6uBchf2gsDdMcCW77h8uDv6tdZ2ZS"
 
       assert Crypto.derive_address(pubkey) == {:ok, pubkeyhash}
       assert signature == Crypto.sign(encoded_private_key, bytes, watermark)

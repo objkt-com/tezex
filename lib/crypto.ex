@@ -254,11 +254,11 @@ defmodule Tezex.Crypto do
   ## Examples
       iex> encoded_private_key = "spsk24EJohZHJkZnWEzj3w9wE7BFARpFmq5WAo9oTtqjdJ2t4pyoB3"
       iex> Tezex.Crypto.sign_message(encoded_private_key, "foo")
-      "sigm9uJiGjdk2DpuqTmHcjzpAdTSQfqKxFuDKodyNT8JP3UvrfoPFTNkFbFgDP1WfAi2PjJ3dcpZFLTagD7gUBmwVWbPr5mk"
+      "spsig1Uyadmsz75zND5qDjSAteir1NGCEuPaxNnT8QmXkwCJkuzWUyxKqKsjSx3nU4uj2nk8t31VFFhQ4YsPKdZ9ghA2d2fe9HF"
       iex> msg = Tezex.Micheline.pack("foo", :string)
       "050100000003666f6f"
       iex> Tezex.Crypto.sign_message(encoded_private_key, msg)
-      "sigm9uJiGjdk2DpuqTmHcjzpAdTSQfqKxFuDKodyNT8JP3UvrfoPFTNkFbFgDP1WfAi2PjJ3dcpZFLTagD7gUBmwVWbPr5mk"
+      "spsig1Uyadmsz75zND5qDjSAteir1NGCEuPaxNnT8QmXkwCJkuzWUyxKqKsjSx3nU4uj2nk8t31VFFhQ4YsPKdZ9ghA2d2fe9HF"
   """
   @spec sign_message(privkey_param(), binary()) :: nonempty_binary()
   def sign_message(privkey_param, "0501" <> _ = bytes) do
@@ -279,7 +279,7 @@ defmodule Tezex.Crypto do
       "ed" <> _ ->
         bytes_hash = Blake2.hash2b(watermark <> msg, 32)
         signature = :crypto.sign(:eddsa, :none, bytes_hash, [decoded_key, :ed25519])
-        Base58Check.encode(signature, @prefix_sig)
+        Base58Check.encode(signature, @prefix_edsig)
 
       "sp" <> _ ->
         pk = %PrivateKey{secret: decoded_key, curve: KnownCurves.secp256k1()}
@@ -293,7 +293,7 @@ defmodule Tezex.Crypto do
 
         signature = :binary.decode_hex(r_bin <> s_bin)
 
-        Base58Check.encode(signature, @prefix_sig)
+        Base58Check.encode(signature, @prefix_spsig)
 
       "p2" <> _ ->
         pk = %PrivateKey{secret: decoded_key, curve: KnownCurves.prime256v1()}
@@ -307,7 +307,7 @@ defmodule Tezex.Crypto do
 
         signature = :binary.decode_hex(r_bin <> s_bin)
 
-        Base58Check.encode(signature, @prefix_sig)
+        Base58Check.encode(signature, @prefix_p2sig)
     end
   end
 

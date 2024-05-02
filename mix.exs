@@ -13,6 +13,7 @@ defmodule Tezex.MixProject do
       description: description(),
       package: package(),
       deps: deps(),
+      start_permanent: Mix.env() == :prod,
       test_coverage: [tool: ExCoveralls],
       preferred_cli_env: [
         coveralls: :test,
@@ -55,6 +56,7 @@ defmodule Tezex.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
+      mod: {Tezex.Application, []},
       extra_applications: [:logger, :crypto]
     ]
   end
@@ -68,7 +70,8 @@ defmodule Tezex.MixProject do
       {:ex_doc, "~> 0.27", only: :dev, runtime: false},
       {:ex_unit_notifier, "~> 1.2", only: :test},
       {:excoveralls, "~> 0.15.1", only: :test},
-      {:jason, "~> 1.4", only: :test},
+      {:finch, "~> 0.10"},
+      {:jason, "~> 1.4"},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:ssl_verify_fun, "~> 1.1", manager: :rebar3, override: true}
     ]
