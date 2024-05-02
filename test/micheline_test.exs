@@ -88,9 +88,7 @@ defmodule Tezex.MichelineTest do
 
       assert ["tz1LKpeN8ZSSFNyTWiBNaE4u4sjaq7J1Vz2z", "tz1XHhjLXQuG9rf9n7o1VbgegMkiggy1oktu"] ==
                Enum.map(expected, fn %{"args" => [%{"bytes" => bytes} | _]} ->
-                 bytes
-                 |> :binary.decode_hex()
-                 |> Forge.unforge_address()
+                 Forge.unforge_address(bytes, :hex)
                end)
     end
 

@@ -9,7 +9,7 @@ defmodule Tezex.ForgeTest do
       addr = "tz1LKpeN8ZSSFNyTWiBNaE4u4sjaq7J1Vz2z"
 
       assert "0000078694ecd15392219b7e47814ecfa11f90192642" ==
-               :binary.encode_hex(Forge.forge_address(addr), :lowercase)
+               Forge.forge_address(addr, :hex)
 
       assert Forge.unforge_address(Forge.forge_address(addr)) == addr
     end
@@ -18,7 +18,7 @@ defmodule Tezex.ForgeTest do
       sig = "edpktsPhZ8weLEXqf4Fo5FS9Qx8ZuX4QpEBEwe63L747G8iDjTAF6w"
 
       assert "001de67a53b0d3ab18dd6c415da17c9f83015489cde2c7165a3ada081a6049b78f" ==
-               :binary.encode_hex(Forge.forge_public_key(sig), :lowercase)
+               Forge.forge_public_key(sig, :hex)
 
       assert Forge.unforge_public_key(Forge.forge_public_key(sig)) == sig
     end
@@ -26,20 +26,18 @@ defmodule Tezex.ForgeTest do
     test "forge_base58" do
       v = "BKpLvH3E3bUa5Z2nb3RkH2p6EKLfymvxUAEgtRJnu4m9UX1TWUb"
 
-      assert :binary.encode_hex(Forge.forge_base58(v), :lowercase) ==
+      assert Forge.forge_base58(v, :hex) ==
                "0dc397b7865779d87bd47d406e8b4eee84498f22ab01dff124433c7f057af5ae"
     end
 
     test "unforge_signature" do
       input =
-        :binary.decode_hex(
-          "49d47dba27bd76208b092f3e500f64818920c817491b8b9094f28c2c2b9c6721b257b8878ce47182122b8ea84aeacd84a8aa28cb1f1fe48a26355a7bca4b8306"
-        )
+        "49d47dba27bd76208b092f3e500f64818920c817491b8b9094f28c2c2b9c6721b257b8878ce47182122b8ea84aeacd84a8aa28cb1f1fe48a26355a7bca4b8306"
 
       output =
         "sigXeXB5JD5TaLb3xgTPKjgf9W45judiCmNP9UBdZBdmtHSGBxL1M8ZSUb6LpjGP2MdfUBTB4WHs5APnvyRV1LooU6QHJuDe"
 
-      assert Forge.unforge_signature(input) == output
+      assert Forge.unforge_signature(input, :hex) == output
     end
 
     test "un/forge int" do
@@ -59,10 +57,14 @@ defmodule Tezex.ForgeTest do
       end)
 
       assert Forge.unforge_int(
-               :binary.decode_hex(
-                 "000521000307430359030a0743035d0a00000015002523250b271e153be6c2668954114be101d04d3d05700005054200030342034d"
-               )
+               "000521000307430359030a0743035d0a00000015002523250b271e153be6c2668954114be101d04d3d05700005054200030342034d",
+               :hex
              ) == {0, 1}
+    end
+
+    test "branch" do
+      assert "560a037fdd573fcb59a49b5835658fab813b57b3a25e96710ec97aad0614c34f" ==
+               Forge.forge_base58("BLNB68pLiAgXiJHXNUK7CDKRnCx1TqzaNGsRXsASg38wNueb8bx", :hex)
     end
   end
 
