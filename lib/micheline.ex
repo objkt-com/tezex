@@ -27,11 +27,11 @@ defmodule Tezex.Micheline do
         "0500" <> Zarith.encode(value)
 
       :string ->
-        hex_bytes = :binary.encode_hex(value, :lowercase)
+        hex_bytes = Base.encode16(value, case: :lower)
         "0501" <> encode_byte_size(hex_bytes) <> hex_bytes
 
       :bytes ->
-        hex_bytes = :binary.encode_hex(value, :lowercase)
+        hex_bytes = Base.encode16(value, case: :lower)
         "050a#{encode_byte_size(hex_bytes)}#{hex_bytes}"
 
       :key_hash ->

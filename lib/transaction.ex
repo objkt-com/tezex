@@ -41,7 +41,6 @@ defmodule Tezex.Transaction do
 
     def encode(value, opts) do
       value
-      |> Map.put(:kind, "transaction")
       |> Map.update!(:fee, &to_string/1)
       |> Map.update!(:gas_limit, &to_string/1)
       |> Map.update!(:amount, &to_string/1)

@@ -13,7 +13,7 @@ defmodule Tezex.Crypto.HMACDRBG do
   {_result, drbg} = HMACDRBG.generate(drbg, 32)
   {result, drbg} = HMACDRBG.generate(drbg, 32)
 
-  :binary.encode_hex(result, :lowercase) == "a00cb0982eec3917b4b48abccfd460366d98b887943ff402bb7147cda174a46f"
+  Base16.encode(result, case: :lower) == "a00cb0982eec3917b4b48abccfd460366d98b887943ff402bb7147cda174a46f"
   ```
 
   Implementation inspired by both:
