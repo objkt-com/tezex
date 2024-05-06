@@ -46,7 +46,7 @@ defmodule Tezex.ForgeOperation do
     end
   end
 
-  def forge_entrypoint(entrypoint) do
+  def entrypoint(entrypoint) do
     case Map.get(@reserved_entrypoints, entrypoint) do
       nil -> <<255>> <> Forge.forge_array(entrypoint, :bytes, 1)
       code -> code
@@ -57,21 +57,21 @@ defmodule Tezex.ForgeOperation do
     <<tag::size(8)>>
   end
 
-  @spec forge_operation(map()) :: nonempty_binary()
-  def forge_operation(content) do
+  @spec operation(map()) :: nonempty_binary()
+  def operation(content) do
     encoders = %{
-      "failing_noop" => &forge_failing_noop/1,
-      "activate_account" => &forge_activate_account/1,
-      "reveal" => &forge_reveal/1,
-      "transaction" => &forge_transaction/1,
-      "origination" => &forge_origination/1,
-      "delegation" => &forge_delegation/1,
-      "endorsement" => &forge_endorsement/1,
-      "endorsement_with_slot" => &forge_endorsement_with_slot/1,
-      "register_global_constant" => &forge_register_global_constant/1,
-      "transfer_ticket" => &forge_transfer_ticket/1,
-      "smart_rollup_add_messages" => &forge_smart_rollup_add_messages/1,
-      "smart_rollup_execute_outbox_message" => &forge_smart_rollup_execute_outbox_message/1
+      "failing_noop" => &failing_noop/1,
+      "activate_account" => &activate_account/1,
+      "reveal" => &reveal/1,
+      "transaction" => &transaction/1,
+      "origination" => &origination/1,
+      "delegation" => &delegation/1,
+      "endorsement" => &endorsement/1,
+      "endorsement_with_slot" => &endorsement_with_slot/1,
+      "register_global_constant" => &register_global_constant/1,
+      "transfer_ticket" => &transfer_ticket/1,
+      "smart_rollup_add_messages" => &smart_rollup_add_messages/1,
+      "smart_rollup_execute_outbox_message" => &smart_rollup_execute_outbox_message/1
     }
 
     encoder = encoders[content["kind"]]
@@ -83,18 +83,18 @@ defmodule Tezex.ForgeOperation do
     encoder.(content)
   end
 
-  @spec forge_operation_group(map()) :: nonempty_binary()
-  def forge_operation_group(operation_group) do
+  @spec operation_group(map()) :: nonempty_binary()
+  def operation_group(operation_group) do
     [
       Forge.forge_base58(operation_group["branch"]),
-      Enum.join(Enum.map(operation_group["contents"], &forge_operation/1))
+      Enum.join(Enum.map(operation_group["contents"], &operation/1))
     ]
     |> IO.iodata_to_binary()
     |> :binary.encode_hex(:lowercase)
   end
 
-  @spec forge_activate_account(map()) :: nonempty_binary()
-  def forge_activate_account(content) do
+  @spec activate_account(map()) :: nonempty_binary()
+  def activate_account(content) do
     [
       forge_tag(@operation_tags[content["kind"]]),
       binary_slice(Forge.forge_address(content["pkh"]), 2..-1//1),
@@ -103,8 +103,8 @@ defmodule Tezex.ForgeOperation do
     |> IO.iodata_to_binary()
   end
 
-  @spec forge_reveal(map()) :: nonempty_binary()
-  def forge_reveal(content) do
+  @spec reveal(map()) :: nonempty_binary()
+  def reveal(content) do
     [
       forge_tag(@operation_tags[content["kind"]]),
       Forge.forge_address(content["source"], :bytes, true),
@@ -117,8 +117,8 @@ defmodule Tezex.ForgeOperation do
     |> IO.iodata_to_binary()
   end
 
-  @spec forge_transaction(map()) :: nonempty_binary()
-  def forge_transaction(content) do
+  @spec transaction(map()) :: nonempty_binary()
+  def transaction(content) do
     [
       forge_tag(@operation_tags[content["kind"]]),
       Forge.forge_address(content["source"], :bytes, true),
@@ -133,7 +133,7 @@ defmodule Tezex.ForgeOperation do
 
         [
           Forge.forge_bool(true),
-          forge_entrypoint(params["entrypoint"]),
+          entrypoint(params["entrypoint"]),
           Forge.forge_array(Forge.forge_micheline(params["value"]))
         ]
       else
@@ -143,8 +143,8 @@ defmodule Tezex.ForgeOperation do
     |> IO.iodata_to_binary()
   end
 
-  @spec forge_origination(map()) :: nonempty_binary()
-  def forge_origination(content) do
+  @spec origination(map()) :: nonempty_binary()
+  def origination(content) do
     [
       forge_tag(@operation_tags[content["kind"]]),
       Forge.forge_address(content["source"], :bytes, true),
@@ -158,16 +158,15 @@ defmodule Tezex.ForgeOperation do
           Forge.forge_bool(false)
 
         delegate ->
-          Forge.forge_bool(true) <>
-            Forge.forge_address(delegate, :bytes, true)
+          [Forge.forge_bool(true), Forge.forge_address(delegate, :bytes, true)]
       end,
       Forge.forge_script(content["script"])
     ]
     |> IO.iodata_to_binary()
   end
 
-  @spec forge_delegation(map()) :: nonempty_binary()
-  def forge_delegation(content) do
+  @spec delegation(map()) :: nonempty_binary()
+  def delegation(content) do
     [
       forge_tag(@operation_tags[content["kind"]]),
       Forge.forge_address(content["source"], :bytes, true),
@@ -186,14 +185,14 @@ defmodule Tezex.ForgeOperation do
     |> IO.iodata_to_binary()
   end
 
-  @spec forge_endorsement(map()) :: nonempty_binary()
-  def forge_endorsement(content) do
+  @spec endorsement(map()) :: nonempty_binary()
+  def endorsement(content) do
     [forge_tag(content["kind"]), Forge.forge_int32(String.to_integer(content["level"]))]
     |> IO.iodata_to_binary()
   end
 
-  @spec forge_inline_endorsement(map()) :: nonempty_binary()
-  def forge_inline_endorsement(content) do
+  @spec inline_endorsement(map()) :: nonempty_binary()
+  def inline_endorsement(content) do
     [
       Forge.forge_base58(content["branch"]),
       Forge.forge_nat(@operation_tags[content["operations"]["kind"]]),
@@ -203,23 +202,23 @@ defmodule Tezex.ForgeOperation do
     |> IO.iodata_to_binary()
   end
 
-  @spec forge_endorsement_with_slot(map()) :: nonempty_binary()
-  def forge_endorsement_with_slot(content) do
+  @spec endorsement_with_slot(map()) :: nonempty_binary()
+  def endorsement_with_slot(content) do
     [
       forge_tag(content["kind"]),
-      Forge.forge_array(forge_inline_endorsement(content["endorsement"])),
+      Forge.forge_array(inline_endorsement(content["endorsement"])),
       Forge.forge_int16(String.to_integer(content["slot"]))
     ]
     |> IO.iodata_to_binary()
   end
 
-  @spec forge_failing_noop(map()) :: nonempty_binary()
-  def forge_failing_noop(content) do
+  @spec failing_noop(map()) :: nonempty_binary()
+  def failing_noop(content) do
     [forge_tag(content["kind"]), Forge.forge_array(content["arbitrary"])] |> IO.iodata_to_binary()
   end
 
-  @spec forge_register_global_constant(map()) :: nonempty_binary()
-  def forge_register_global_constant(content) do
+  @spec register_global_constant(map()) :: nonempty_binary()
+  def register_global_constant(content) do
     [
       forge_tag(@operation_tags[content["kind"]]),
       Forge.forge_address(content["source"], :bytes, true),
@@ -232,8 +231,8 @@ defmodule Tezex.ForgeOperation do
     |> IO.iodata_to_binary()
   end
 
-  @spec forge_transfer_ticket(map()) :: nonempty_binary()
-  def forge_transfer_ticket(content) do
+  @spec transfer_ticket(map()) :: nonempty_binary()
+  def transfer_ticket(content) do
     [
       forge_tag(@operation_tags[content["kind"]]),
       Forge.forge_address(content["source"], :bytes, true),
@@ -251,8 +250,8 @@ defmodule Tezex.ForgeOperation do
     |> IO.iodata_to_binary()
   end
 
-  @spec forge_smart_rollup_add_messages(map()) :: nonempty_binary()
-  def forge_smart_rollup_add_messages(content) do
+  @spec smart_rollup_add_messages(map()) :: nonempty_binary()
+  def smart_rollup_add_messages(content) do
     [
       forge_tag(@operation_tags[content["kind"]]),
       Forge.forge_address(content["source"], :bytes, true),
@@ -270,8 +269,8 @@ defmodule Tezex.ForgeOperation do
     |> IO.iodata_to_binary()
   end
 
-  @spec forge_smart_rollup_execute_outbox_message(map()) :: nonempty_binary()
-  def forge_smart_rollup_execute_outbox_message(content) do
+  @spec smart_rollup_execute_outbox_message(map()) :: nonempty_binary()
+  def smart_rollup_execute_outbox_message(content) do
     [
       forge_tag(@operation_tags[content["kind"]]),
       Forge.forge_address(content["source"], :bytes, true),

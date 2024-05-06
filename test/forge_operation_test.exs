@@ -17,7 +17,7 @@ defmodule Tezex.ForgeOperationTest do
       }
 
       result =
-        ForgeOperation.forge_transaction(transaction)
+        ForgeOperation.transaction(transaction)
         |> :binary.encode_hex(:lowercase)
 
       assert result ==
@@ -36,7 +36,7 @@ defmodule Tezex.ForgeOperationTest do
       }
 
       result =
-        ForgeOperation.forge_transaction(transaction)
+        ForgeOperation.transaction(transaction)
         |> :binary.encode_hex(:lowercase)
 
       assert result ==
@@ -72,7 +72,7 @@ defmodule Tezex.ForgeOperationTest do
       }
 
       result =
-        ForgeOperation.forge_transaction(transaction)
+        ForgeOperation.transaction(transaction)
         |> :binary.encode_hex(:lowercase)
 
       assert result ==
@@ -91,7 +91,7 @@ defmodule Tezex.ForgeOperationTest do
       }
 
       result =
-        ForgeOperation.forge_reveal(reveal)
+        ForgeOperation.reveal(reveal)
         |> :binary.encode_hex(:lowercase)
 
       assert result ==
@@ -134,7 +134,7 @@ defmodule Tezex.ForgeOperationTest do
       }
 
       result =
-        ForgeOperation.forge_operation(origination)
+        ForgeOperation.operation(origination)
         |> :binary.encode_hex(:lowercase)
 
       assert result ==
@@ -178,7 +178,7 @@ defmodule Tezex.ForgeOperationTest do
       }
 
       result =
-        ForgeOperation.forge_operation(origination)
+        ForgeOperation.operation(origination)
         |> :binary.encode_hex(:lowercase)
 
       assert result ==
@@ -197,7 +197,7 @@ defmodule Tezex.ForgeOperationTest do
       }
 
       result =
-        ForgeOperation.forge_delegation(delegation)
+        ForgeOperation.delegation(delegation)
         |> :binary.encode_hex(:lowercase)
 
       assert result ==
@@ -206,7 +206,7 @@ defmodule Tezex.ForgeOperationTest do
       delegation = %{delegation | "delegate" => nil}
 
       result =
-        ForgeOperation.forge_delegation(delegation)
+        ForgeOperation.delegation(delegation)
         |> :binary.encode_hex(:lowercase)
 
       assert result == "6e0069ef8fb5d47d8a4321c94576a2316a632be8ce89904e09924e914e00"
@@ -220,7 +220,7 @@ defmodule Tezex.ForgeOperationTest do
       }
 
       result =
-        ForgeOperation.forge_activate_account(activation)
+        ForgeOperation.activate_account(activation)
         |> :binary.encode_hex(:lowercase)
 
       assert result ==

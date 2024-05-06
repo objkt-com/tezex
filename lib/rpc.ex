@@ -107,7 +107,7 @@ defmodule Tezex.Rpc do
     block_hash = binary_part(block_head["hash"], 0, 51)
 
     forged_operation_group =
-      ForgeOperation.forge_operation_group(%{"branch" => block_hash, "contents" => operations})
+      ForgeOperation.operation_group(%{"branch" => block_hash, "contents" => operations})
 
     op_signature =
       Crypto.sign_message(
@@ -119,10 +119,10 @@ defmodule Tezex.Rpc do
 
     op_pair = %{bytes: signed_op_group, signature: op_signature}
 
-    applied = preapply_operation(rpc, block_hash, block_head["protocol"], operations, op_pair)
-    injected_op = inject_operation(rpc, op_pair)
+    # applied = preapply_operation(rpc, block_hash, block_head["protocol"], operations, op_pair)
+    # injected_op = inject_operation(rpc, op_pair)
 
-    %{results: applied[0], operation_group_id: injected_op = inject_operation(rpc, op_pair)}
+    # %{results: applied[0], operation_group_id: injected_op = inject_operation(rpc, op_pair)}
   end
 
   def get_counter_for_account(%Rpc{} = rpc, address) do

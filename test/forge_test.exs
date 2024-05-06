@@ -164,7 +164,7 @@ defmodule Tezex.ForgeTest do
         "signature" => nil
       }
 
-      local = ForgeOperation.forge_operation_group(opg)
+      local = ForgeOperation.operation_group(opg)
 
       remote =
         "0dc397b7865779d87bd47d406e8b4eee84498f22ab01dff124433c7f057af5ae6c00e8b36c80efb51ec85a14562426049aa182a3ce38d2ae06a59e1b80bd3fe0d4030001e5ebf2dcc7dcc9d13c2c45cd76823dd604740c7f0000"
