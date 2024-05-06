@@ -90,7 +90,7 @@ defmodule Tezex.ForgeOperation do
       Enum.join(Enum.map(operation_group["contents"], &operation/1))
     ]
     |> IO.iodata_to_binary()
-    |> :binary.encode_hex(:lowercase)
+    |> Base.encode16(case: :lower)
   end
 
   @spec activate_account(map()) :: nonempty_binary()

@@ -10,7 +10,7 @@ defmodule Tezex.Crypto.HMACDRBGTest do
 
     {result, _} = HMACDRBG.generate(drbg, 32)
 
-    assert :binary.encode_hex(result, :lowercase) ==
+    assert Base.encode16(result, case: :lower) ==
              "018ec5f8e08c41e5ac974eb129ac297c5388ee1864324fa13d9b15cf98d9a157"
   end
 
@@ -21,7 +21,7 @@ defmodule Tezex.Crypto.HMACDRBGTest do
 
     {result, _} = HMACDRBG.generate(drbg, 32)
 
-    assert :binary.encode_hex(result, :lowercase) ==
+    assert Base.encode16(result, case: :lower) ==
              "ed5d61ecf0ef38258e62f03bbb49f19f2cd07ba5145a840d83b134d5963b3633"
   end
 
@@ -64,7 +64,7 @@ defmodule Tezex.Crypto.HMACDRBGTest do
             HMACDRBG.generate(drbg, 256, add)
           end)
 
-        assert :binary.encode_hex(result, :lowercase) == expected
+        assert Base.encode16(result, case: :lower) == expected
       end
     end
   end

@@ -515,7 +515,7 @@ defmodule Tezex.Forge do
       10 ->
         {val, offset} = unforge_array(binary_slice(data, ptr..-1//1))
         ptr = ptr + offset
-        {%{"bytes" => :binary.encode_hex(val, :lowercase)}, ptr}
+        {%{"bytes" => Base.encode16(val, case: :lower)}, ptr}
 
       _ ->
         raise "Unknown tag: #{tag} at position #{ptr}"
@@ -630,5 +630,5 @@ defmodule Tezex.Forge do
 
   @spec encode_output(binary(), io_encoding()) :: binary()
   defp encode_output(data, :bytes), do: data
-  defp encode_output(data, :hex), do: :binary.encode_hex(data, :lowercase)
+  defp encode_output(data, :hex), do: Base.encode16(data, case: :lower)
 end
