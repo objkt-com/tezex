@@ -59,28 +59,20 @@ defmodule Tezex.ForgeOperation do
 
   @spec operation(map()) :: nonempty_binary()
   def operation(content) do
-    encoders = %{
-      "failing_noop" => &failing_noop/1,
-      "activate_account" => &activate_account/1,
-      "reveal" => &reveal/1,
-      "transaction" => &transaction/1,
-      "origination" => &origination/1,
-      "delegation" => &delegation/1,
-      "endorsement" => &endorsement/1,
-      "endorsement_with_slot" => &endorsement_with_slot/1,
-      "register_global_constant" => &register_global_constant/1,
-      "transfer_ticket" => &transfer_ticket/1,
-      "smart_rollup_add_messages" => &smart_rollup_add_messages/1,
-      "smart_rollup_execute_outbox_message" => &smart_rollup_execute_outbox_message/1
-    }
-
-    encoder = encoders[content["kind"]]
-
-    if is_nil(encoder) do
-      raise "No encoder for #{content["kind"]}"
+    case content["kind"] do
+      "failing_noop" -> failing_noop(content)
+      "activate_account" -> activate_account(content)
+      "reveal" -> reveal(content)
+      "transaction" -> transaction(content)
+      "origination" -> origination(content)
+      "delegation" -> delegation(content)
+      "endorsement" -> endorsement(content)
+      "endorsement_with_slot" -> endorsement_with_slot(content)
+      "register_global_constant" -> register_global_constant(content)
+      "transfer_ticket" -> transfer_ticket(content)
+      "smart_rollup_add_messages" -> smart_rollup_add_messages(content)
+      "smart_rollup_execute_outbox_message" -> smart_rollup_execute_outbox_message(content)
     end
-
-    encoder.(content)
   end
 
   @spec operation_group(map()) :: nonempty_binary()

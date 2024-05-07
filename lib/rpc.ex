@@ -1,9 +1,7 @@
 defmodule Tezex.Rpc do
-  # alias Tezex.Crypto
-  # alias Tezex.Crypto.Base58Check
-  # alias Tezex.ForgeOperation
+  alias Tezex.Crypto
+  alias Tezex.ForgeOperation
   alias Tezex.Rpc
-  alias Tezex.Transaction
 
   @type t() :: %__MODULE__{
           endpoint: binary(),
@@ -69,61 +67,33 @@ defmodule Tezex.Rpc do
 
   # @genesis_block_time ~U[2018-06-30 10:07:32.000Z]
 
-  def build_contract_operation(
-        %Rpc{} = _rpc,
-        public_key_hash,
-        counter,
-        contract,
-        amount,
-        fee,
-        storage_limit,
-        gas_limit,
-        entrypoint,
-        parameters,
-        _encoded_private_key
-      ) do
-    parameters =
-      cond do
-        not is_nil(parameters) -> %{entrypoint: entrypoint || "default", value: parameters}
-        not is_nil(entrypoint) -> %{entrypoint: entrypoint, value: []}
-        true -> nil
-      end
+  def send_operation(%Rpc{} = rpc, contents, wallet_address, encoded_private_key, offset \\ 0) do
+    {:ok, block_head} = get_block_at_offset(rpc, offset)
+    branch = binary_part(block_head["hash"], 0, 51)
 
-    %Transaction{
-      source: public_key_hash,
-      destination: contract,
-      amount: Integer.to_string(amount),
-      storage_limit: Integer.to_string(storage_limit),
-      gas_limit: Integer.to_string(gas_limit),
-      counter: Integer.to_string(counter),
-      fee: Integer.to_string(fee),
-      kind: "transaction",
-      parameters: parameters
+    counter = get_next_counter_for_account(rpc, wallet_address)
+
+    contents =
+      contents
+      |> Enum.with_index()
+      |> Enum.map(fn {c, i} ->
+        Map.merge(c, %{"counter" => Integer.to_string(counter + i), "source" => wallet_address})
+      end)
+
+    operation = %{
+      "branch" => branch,
+      "contents" => contents
     }
+
+    forged_operation = ForgeOperation.operation_group(operation)
+
+    signature = Crypto.sign_operation(encoded_private_key, forged_operation)
+    {:ok, decoded_signature} = Crypto.decode_signature(signature)
+
+    decoded_signature = Base.encode16(decoded_signature, case: :lower)
+
+    inject_operation(rpc, forged_operation, decoded_signature)
   end
-
-  # def send_operation(%Rpc{} = rpc, operations, encoded_private_key, offset) do
-  #   {:ok, block_head} = get_block_at_offset(rpc, offset)
-  #   block_hash = binary_part(block_head["hash"], 0, 51)
-
-  #   forged_operation_group =
-  #     ForgeOperation.operation_group(%{"branch" => block_hash, "contents" => operations})
-
-  #   op_signature =
-  #     Crypto.sign_message(
-  #       encoded_private_key,
-  #       @operation_group_watermark <> forged_operation_group
-  #     )
-
-  #   signed_op_group = forged_operation_group <> op_signature
-
-  #   op_pair = %{bytes: signed_op_group, signature: op_signature}
-
-  #   # applied = preapply_operation(rpc, block_hash, block_head["protocol"], operations, op_pair)
-  #   # injected_op = inject_operation(rpc, op_pair)
-
-  #   # %{results: applied[0], operation_group_id: injected_op = inject_operation(rpc, op_pair)}
-  # end
 
   def get_counter_for_account(%Rpc{} = rpc, address) do
     with {:ok, n} <- get(rpc, "/blocks/head/context/contracts/#{address}/counter"),
@@ -153,7 +123,7 @@ defmodule Tezex.Rpc do
     post(rpc, "/injection/operation", forged_operation <> signature)
   end
 
-  def get(%Rpc{} = rpc, path) do
+  defp get(%Rpc{} = rpc, path) do
     url =
       URI.parse(rpc.endpoint)
       |> URI.append_path("/chains/#{rpc.chain_id}")
@@ -168,11 +138,10 @@ defmodule Tezex.Rpc do
     end
   end
 
-  def post(%Rpc{} = rpc, path, body) do
+  defp post(%Rpc{} = rpc, path, body) do
     url =
       URI.parse(rpc.endpoint)
-      # 🚧 Try to reproduce the same API as the rest of this file but it doesn't make sense for the injection endpoint since it doesn't include the /chains/id
-      # |> URI.append_path("/chains/#{rpc.chain_id}")
+      |> URI.append_query(URI.encode_query(%{"chain" => rpc.chain_id}))
       |> URI.append_path(path)
       |> URI.to_string()
 
