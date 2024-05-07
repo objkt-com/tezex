@@ -312,35 +312,35 @@ defmodule Tezex.Crypto do
   end
 
   @spec decode_signature(binary()) :: {:error, :invalid_signature} | {:ok, binary()}
-  defp decode_signature("edsig" <> _ = sig) do
+  def decode_signature("edsig" <> _ = sig) do
     case Base58Check.decode58(sig) do
       {:ok, <<@prefix_edsig, sig::binary-size(64)>> <> _} -> {:ok, sig}
       _ -> {:error, :invalid_signature}
     end
   end
 
-  defp decode_signature("spsig" <> _ = sig) do
+  def decode_signature("spsig" <> _ = sig) do
     case Base58Check.decode58(sig) do
       {:ok, <<@prefix_spsig, sig::binary-size(64)>> <> _} -> {:ok, sig}
       _ -> {:error, :invalid_signature}
     end
   end
 
-  defp decode_signature("p2sig" <> _ = sig) do
+  def decode_signature("p2sig" <> _ = sig) do
     case Base58Check.decode58(sig) do
       {:ok, <<@prefix_p2sig, sig::binary-size(64)>> <> _} -> {:ok, sig}
       _ -> {:error, :invalid_signature}
     end
   end
 
-  defp decode_signature("sig" <> _ = sig) do
+  def decode_signature("sig" <> _ = sig) do
     case Base58Check.decode58(sig) do
       {:ok, <<@prefix_sig, sig::binary-size(64)>> <> _} -> {:ok, sig}
       _ -> {:error, :invalid_signature}
     end
   end
 
-  defp decode_signature(_) do
+  def decode_signature(_) do
     {:error, :invalid_signature}
   end
 
