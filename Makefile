@@ -43,6 +43,11 @@ test-watch: deps
 	@echo "🥽 Run the tests on changes"
 	mix test.watch
 
+.PHONY: test-tezos
+test-tezos: deps
+	@echo "🧪 Run the tezos tests"
+	mix test --only tezos
+
 .PHONY: coverage
 coverage: cover
 cover: deps $(ex_files) $(exs_files)
