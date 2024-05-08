@@ -99,6 +99,43 @@ defmodule Tezex.RpcTest do
   #   )
   # end
 
+  test "prepare_operation" do
+    contents = [
+      %{
+        "amount" => "100",
+        "destination" => @ghostnet_2_address,
+        "fee" => "349",
+        "gas_limit" => "186",
+        "kind" => "transaction",
+        "storage_limit" => "0"
+      }
+    ]
+
+    counter = 1123
+    branch = "BLWdshvgEYbtUaABnmqkMuyMezpfsu36DEJPDJN63CW3TFuk7bP"
+
+    result =
+      Enum.join(
+        [
+          "6940b2318870c4b84862aef187c1bbcd4138170459e85092fe34be5d179f40ac6c00980d7c",
+          "ebb50d4b83a4e3307b3ca1b40ebe8f71abdd02e308ba0100640000b75f0c30536bee108b06",
+          "8d90b151ce846aca11b10054b408a1f2168d72618c3d4c01cd3ea40d7255cae1e52f7bfbbe",
+          "cfa8a0d0c42a3a958d8f9a457c3d0369fcf9d3c49e6ade9d239548b19ea9c867f694531e7e",
+          "04"
+        ],
+        ""
+      )
+
+    assert result ==
+             Rpc.prepare_operation(
+               contents,
+               @ghostnet_1_address,
+               @ghostnet_1_pkey,
+               counter,
+               branch
+             )
+  end
+
   @tag :tezos
   test "inject an operation" do
     rpc = %Rpc{endpoint: @endpoint}
