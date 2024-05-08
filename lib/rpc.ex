@@ -72,12 +72,20 @@ defmodule Tezex.Rpc do
     branch = binary_part(block_head["hash"], 0, 51)
 
     counter = get_next_counter_for_account(rpc, wallet_address)
+    payload = prepare_operation(contents, wallet_address, encoded_private_key, counter, branch)
 
+    inject_operation(rpc, payload)
+  end
+
+  def prepare_operation(contents, wallet_address, encoded_private_key, counter, branch) do
     contents =
       contents
-      |> Enum.with_index()
-      |> Enum.map(fn {c, i} ->
-        Map.merge(c, %{"counter" => Integer.to_string(counter + i), "source" => wallet_address})
+      |> Enum.with_index(counter)
+      |> Enum.map(fn {operation, counter} ->
+        Map.merge(operation, %{
+          "counter" => Integer.to_string(counter),
+          "source" => wallet_address
+        })
       end)
 
     operation = %{
@@ -87,12 +95,12 @@ defmodule Tezex.Rpc do
 
     forged_operation = ForgeOperation.operation_group(operation)
 
-    signature = Crypto.sign_operation(encoded_private_key, forged_operation)
-    {:ok, decoded_signature} = Crypto.decode_signature(signature)
+    payload_signature =
+      Crypto.sign_operation(encoded_private_key, forged_operation)
+      |> Crypto.decode_signature!()
+      |> Base.encode16(case: :lower)
 
-    decoded_signature = Base.encode16(decoded_signature, case: :lower)
-
-    inject_operation(rpc, forged_operation, decoded_signature)
+    forged_operation <> payload_signature
   end
 
   def get_counter_for_account(%Rpc{} = rpc, address) do
@@ -119,8 +127,8 @@ defmodule Tezex.Rpc do
     get(rpc, "/blocks/#{head["header"]["level"] - offset}")
   end
 
-  def inject_operation(%Rpc{} = rpc, forged_operation, signature) do
-    post(rpc, "/injection/operation", forged_operation <> signature)
+  def inject_operation(%Rpc{} = rpc, payload) do
+    post(rpc, "/injection/operation", payload)
   end
 
   defp get(%Rpc{} = rpc, path) do

@@ -311,6 +311,12 @@ defmodule Tezex.Crypto do
     end
   end
 
+  @spec decode_signature!(binary()) :: binary()
+  def decode_signature!(sig) do
+    {:ok, decoded} = decode_signature(sig)
+    decoded
+  end
+
   @spec decode_signature(binary()) :: {:error, :invalid_signature} | {:ok, binary()}
   def decode_signature("edsig" <> _ = sig) do
     case Base58Check.decode58(sig) do
