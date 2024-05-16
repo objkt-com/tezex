@@ -114,26 +114,72 @@ defmodule Tezex.RpcTest do
     counter = 1123
     branch = "BLWdshvgEYbtUaABnmqkMuyMezpfsu36DEJPDJN63CW3TFuk7bP"
 
-    result =
-      Enum.join(
-        [
-          "6940b2318870c4b84862aef187c1bbcd4138170459e85092fe34be5d179f40ac6c00980d7c",
-          "ebb50d4b83a4e3307b3ca1b40ebe8f71abdd02e308ba0100640000b75f0c30536bee108b06",
-          "8d90b151ce846aca11b10054b408a1f2168d72618c3d4c01cd3ea40d7255cae1e52f7bfbbe",
-          "cfa8a0d0c42a3a958d8f9a457c3d0369fcf9d3c49e6ade9d239548b19ea9c867f694531e7e",
-          "04"
-        ],
-        ""
-      )
-
-    assert result ==
+    assert %{
+             "branch" => "BLWdshvgEYbtUaABnmqkMuyMezpfsu36DEJPDJN63CW3TFuk7bP",
+             "contents" => [
+               %{
+                 "amount" => "100",
+                 "counter" => "1123",
+                 "destination" => "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B",
+                 "fee" => "0",
+                 "gas_limit" => "1451",
+                 "kind" => "transaction",
+                 "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
+                 "storage_limit" => "257"
+               }
+             ]
+           } ==
              Rpc.prepare_operation(
                contents,
                @ghostnet_1_address,
-               @ghostnet_1_pkey,
                counter,
                branch
              )
+  end
+
+  @tag :tezos
+  test "fill_operation_fee" do
+    rpc = %Rpc{endpoint: @endpoint}
+
+    contents = [
+      %{
+        "amount" => "100",
+        "destination" => @ghostnet_2_address,
+        "fee" => "349",
+        "gas_limit" => "186",
+        "kind" => "transaction",
+        "storage_limit" => "0"
+      }
+    ]
+
+    {:ok, block_head} = Rpc.get_block_at_offset(rpc, 0)
+    branch = binary_part(block_head["hash"], 0, 51)
+    counter = Rpc.get_next_counter_for_account(rpc, @ghostnet_1_address)
+
+    operation =
+      Rpc.prepare_operation(
+        contents,
+        @ghostnet_1_address,
+        counter,
+        branch
+      )
+
+    assert %{
+             "branch" => branch,
+             "contents" => [
+               %{
+                 "amount" => "100",
+                 "counter" => "26949355",
+                 "destination" => "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B",
+                 "fee" => "287",
+                 "gas_limit" => "269",
+                 "kind" => "transaction",
+                 "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
+                 "storage_limit" => "0"
+               }
+             ]
+           } ==
+             Rpc.fill_operation_fee(rpc, operation, @ghostnet_1_pkey, branch, [])
   end
 
   @tag :tezos
@@ -155,5 +201,24 @@ defmodule Tezex.RpcTest do
              Rpc.send_operation(rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)
 
     assert is_binary(operation_id)
+  end
+
+  test "raise" do
+    rpc = %Rpc{endpoint: @endpoint}
+
+    contents = [
+      %{
+        "amount" => "1000000000",
+        "destination" => @ghostnet_2_address,
+        "fee" => "349",
+        "gas_limit" => "186",
+        "kind" => "transaction",
+        "storage_limit" => "0"
+      }
+    ]
+
+    assert_raise RuntimeError, fn ->
+      Rpc.send_operation(rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)
+    end
   end
 end
