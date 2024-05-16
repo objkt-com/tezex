@@ -2,6 +2,7 @@ defmodule Tezex.Rpc do
   alias Tezex.Crypto
   alias Tezex.ForgeOperation
   alias Tezex.Rpc
+  alias Tezex.Fee
 
   @type t() :: %__MODULE__{
           endpoint: binary(),
@@ -12,95 +13,152 @@ defmodule Tezex.Rpc do
 
   defstruct [:endpoint, chain_id: "main", headers: [], opts: []]
 
-  # Various constants for the Tezos platforms. Fees are expressed in µtz unless otherwise noted, storage unit is bytes.
-  # @operation_group_watermark <<3>>
+  def prepare_operation(contents, wallet_address, counter, branch) do
+    contents =
+      contents
+      |> Enum.with_index(counter)
+      |> Enum.map(fn {content, counter} ->
+        Map.merge(content, %{
+          "counter" => Integer.to_string(counter),
+          "source" => wallet_address,
+          "gas_limit" => Integer.to_string(Fee.default_gas_limit(content)),
+          "storage_limit" => Integer.to_string(Fee.default_storage_limit(content)),
+          "fee" => "0"
+        })
+      end)
 
-  # @default_simple_transaction_fee 1420
-  # @default_transaction_storage_limit 496
-  # @default_transaction_gas_limit 10600
+    %{
+      "branch" => branch,
+      "contents" => contents
+    }
+  end
 
-  # @default_delegation_fee 1258
-  # @default_delegation_storage_limit 0
-  # @default_delegation_gas_limit 1100
+  def fill_operation_fee(%Rpc{} = rpc, operation, encoded_private_key, branch, opts) do
+    storage_limit = Keyword.get(opts, :storage_limit)
 
-  # @default_key_reveal_fee 1270
-  # @default_key_reveal_storage_limit 0
-  # @default_key_reveal_gas_limit 1100
+    {:ok, %{"protocol" => protocol}} = get(rpc, "/blocks/#{branch}/protocols")
 
-  # @p005_manager_contract_withdrawal_gas_limit 26283
-  # @p005_manager_contract_deposit_gas_limit 15285
-  # @p005_manager_contract_withdrawal_storage_limit 496
+    forged_operation = ForgeOperation.operation_group(operation)
 
-  # @p001_storage_rate 1_000_000 / 1000
-  # @p007_storage_rate 250_000 / 1000
-  # @storage_rate @p007_storage_rate
+    signature = Crypto.sign_operation(encoded_private_key, forged_operation)
 
-  # @base_operation_fee 100
+    {:ok, [%{"contents" => operation_result}]} =
+      preapply_operation(rpc, operation, signature, protocol)
 
-  # @p009_block_gas_cap 10_400_000
-  # @p010_block_gas_cap 5_200_000
-  # @p016_block_gas_cap 2_600_000
-  # @p007_operation_gas_cap 1_040_000
-  # @operation_gas_cap @p007_operation_gas_cap
-  # @block_gas_cap @p016_block_gas_cap
+    applied? =
+      Enum.all?(operation_result, &(&1["metadata"]["operation_result"]["status"] == "applied"))
 
-  # @p010_operation_storage_cap 60_000
-  # @p011_operation_storage_cap 32_768
-  # @operation_storage_cap @p011_operation_storage_cap
+    unless applied? do
+      raise inspect(Enum.map(operation_result, & &1["metadata"]["operation_result"]["errors"]))
+    end
 
-  # @empty_account_storage_burn 257
+    number_contents = length(operation_result)
 
-  # @default_baker_vig 200
+    contents =
+      Enum.map(operation_result, fn content ->
+        if validation_passes(content["kind"]) == 3 do
+          consumed_milligas =
+            case content["metadata"]["operation_result"]["consumed_milligas"] do
+              nil -> 0
+              v -> String.to_integer(v)
+            end
 
-  # @gas_limit_padding 1000
-  # @storage_limit_padding 25
+          gas_limit_new = ceil(consumed_milligas / 1000)
 
-  # @head_branch_offset 54
-  # @max_branch_offset 64
+          gas_limit_new =
+            if content["kind"] in ~w(origination transaction) do
+              gas_limit_new + Fee.default_gas_reserve()
+            else
+              gas_limit_new
+            end
 
-  # Outbound operation queue timeout in seconds. After this period, TezosOperationQueue will attempt to submit the transactions currently in queue.
-  # @default_batch_delay 25
+          storage_limit_new =
+            if is_nil(storage_limit) do
+              paid_storage_size_diff =
+                case content["metadata"]["operation_result"]["paid_storage_size_diff"] do
+                  nil -> 0
+                  v -> String.to_integer(v)
+                end
 
-  # @p009_block_time 60
-  # @p010_block_time 30
-  # @default_block_time @p010_block_time
+              burned =
+                case content["metadata"]["operation_result"]["allocated_destination_contract"] ||
+                       content["metadata"]["operation_result"]["originated_contracts"] do
+                  nil -> 0
+                  _ -> 257
+                end
 
-  # @genesis_block_time ~U[2018-06-30 10:07:32.000Z]
+              paid_storage_size_diff + burned
+            else
+              div(storage_limit, number_contents)
+            end
 
-  def send_operation(%Rpc{} = rpc, contents, wallet_address, encoded_private_key, offset \\ 0) do
+          content = Map.drop(content, ~w(metadata))
+
+          fee =
+            Fee.calculate_fee(content, gas_limit_new,
+              extra_size: 1 + div(Fee.extra_size(), number_contents)
+            )
+
+          %{
+            content
+            | "gas_limit" => Integer.to_string(gas_limit_new),
+              "storage_limit" => Integer.to_string(storage_limit_new),
+              "fee" => Integer.to_string(fee)
+          }
+        else
+          content
+        end
+      end)
+
+    %{operation | "contents" => contents}
+  end
+
+  def send_operation(%Rpc{} = rpc, contents, wallet_address, encoded_private_key, opts \\ []) do
+    offset = Keyword.get(opts, :offset, 0)
+
     {:ok, block_head} = get_block_at_offset(rpc, offset)
     branch = binary_part(block_head["hash"], 0, 51)
 
     counter = get_next_counter_for_account(rpc, wallet_address)
-    payload = prepare_operation(contents, wallet_address, encoded_private_key, counter, branch)
+    operation = prepare_operation(contents, wallet_address, counter, branch)
+
+    operation = fill_operation_fee(rpc, operation, encoded_private_key, branch, opts)
+
+    forged_operation = ForgeOperation.operation_group(operation)
+
+    signature = Crypto.sign_operation(encoded_private_key, forged_operation)
+
+    payload_signature =
+      signature
+      |> Crypto.decode_signature!()
+      |> Base.encode16(case: :lower)
+
+    payload = forged_operation <> payload_signature
 
     inject_operation(rpc, payload)
   end
 
-  def prepare_operation(contents, wallet_address, encoded_private_key, counter, branch) do
-    contents =
-      contents
-      |> Enum.with_index(counter)
-      |> Enum.map(fn {operation, counter} ->
-        Map.merge(operation, %{
-          "counter" => Integer.to_string(counter),
-          "source" => wallet_address
-        })
-      end)
-
-    operation = %{
-      "branch" => branch,
-      "contents" => contents
-    }
-
-    forged_operation = ForgeOperation.operation_group(operation)
-
-    payload_signature =
-      Crypto.sign_operation(encoded_private_key, forged_operation)
-      |> Crypto.decode_signature!()
-      |> Base.encode16(case: :lower)
-
-    forged_operation <> payload_signature
+  # NOTE: Explanation: https://pytezos.baking-bad.org/tutorials/02.html#operation-group
+  defp validation_passes(kind) do
+    case kind do
+      "failing_noop" -> -1
+      "endorsement" -> 0
+      "endorsement_with_slot" -> 0
+      "proposals" -> 1
+      "ballot" -> 1
+      "seed_nonce_revelation" -> 2
+      "double_endorsement_evidence" -> 2
+      "double_baking_evidence" -> 2
+      "activate_account" -> 2
+      "reveal" -> 3
+      "transaction" -> 3
+      "origination" -> 3
+      "delegation" -> 3
+      "register_global_constant" -> 3
+      "transfer_ticket" -> 3
+      "smart_rollup_add_messages" -> 3
+      "smart_rollup_execute_outbox_message" -> 3
+    end
   end
 
   def get_counter_for_account(%Rpc{} = rpc, address) do
@@ -127,6 +185,15 @@ defmodule Tezex.Rpc do
     get(rpc, "/blocks/#{head["header"]["level"] - offset}")
   end
 
+  @doc """
+  Simulate the application of the operations with the context of the given block and return the result of each operation application.
+  """
+  def preapply_operation(%Rpc{} = rpc, operation, signature, protocol) do
+    payload = [Map.merge(operation, %{"signature" => signature, "protocol" => protocol})]
+
+    post(rpc, "/blocks/head/helpers/preapply/operations", payload)
+  end
+
   def inject_operation(%Rpc{} = rpc, payload) do
     post(rpc, "/injection/operation", payload)
   end
@@ -149,7 +216,16 @@ defmodule Tezex.Rpc do
   defp post(%Rpc{} = rpc, path, body) do
     url =
       URI.parse(rpc.endpoint)
-      |> URI.append_query(URI.encode_query(%{"chain" => rpc.chain_id}))
+
+    url =
+      if String.starts_with?(path, "/blocks") do
+        URI.append_path(url, "/chains/#{rpc.chain_id}")
+      else
+        URI.append_query(url, URI.encode_query(%{"chain" => rpc.chain_id}))
+      end
+
+    url =
+      url
       |> URI.append_path(path)
       |> URI.to_string()
 
