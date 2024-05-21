@@ -276,7 +276,7 @@ defmodule Tezex.RpcTest do
                    "amount" => "1000000",
                    "counter" => "26949360",
                    "destination" => "KT1MFWsAXGUZ4gFkQnjByWjrrVtuQi4Tya8G",
-                   "fee" => "649",
+                   "fee" => "651",
                    "gas_limit" => "2419",
                    "kind" => "transaction",
                    "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
@@ -326,7 +326,7 @@ defmodule Tezex.RpcTest do
                "contents" => [
                  %{
                    "amount" => "100",
-                   "fee" => "284",
+                   "fee" => "285",
                    "gas_limit" => "269",
                    "storage_limit" => "0"
                  }
