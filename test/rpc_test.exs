@@ -54,6 +54,29 @@ defmodule Tezex.RpcTest do
              )
   end
 
+  test "injection_payload/2" do
+    operation = %{
+      "branch" => "BLWdshvgEYbtUaABnmqkMuyMezpfsu36DEJPDJN63CW3TFuk7bP",
+      "contents" => [
+        %{
+          "amount" => "100",
+          "counter" => "1123",
+          "destination" => "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B",
+          "fee" => "0",
+          "gas_limit" => "1451",
+          "kind" => "transaction",
+          "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
+          "storage_limit" => "257"
+        }
+      ]
+    }
+
+    result =
+      "6940b2318870c4b84862aef187c1bbcd4138170459e85092fe34be5d179f40ac6c00980d7cebb50d4b83a4e3307b3ca1b40ebe8f71ab00e308ab0b8102640000b75f0c30536bee108b068d90b151ce846aca11b1009bc207291f08c7117ea3a341328a036ce7bd5da996d9148cc491f96c3097748d7adcdb60599504ae5227aea4a6e69d536baaf96ae2bbb6c261a69d000b323f0a"
+
+    assert result == Rpc.injection_payload(operation, @ghostnet_1_pkey)
+  end
+
   describe "fill_operation_fee/3" do
     test "a contract operation" do
       operation = %{
