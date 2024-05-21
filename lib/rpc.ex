@@ -120,6 +120,12 @@ defmodule Tezex.Rpc do
 
     operation = fill_operation_fee(operation, operation_result, opts)
 
+    payload = injection_payload(operation, encoded_private_key)
+
+    inject_operation(rpc, payload)
+  end
+
+  def injection_payload(operation, encoded_private_key) do
     forged_operation = ForgeOperation.operation_group(operation)
 
     signature = Crypto.sign_operation(encoded_private_key, forged_operation)
@@ -129,9 +135,7 @@ defmodule Tezex.Rpc do
       |> Crypto.decode_signature!()
       |> Base.encode16(case: :lower)
 
-    payload = forged_operation <> payload_signature
-
-    inject_operation(rpc, payload)
+    forged_operation <> payload_signature
   end
 
   # NOTE: Explanation: https://pytezos.baking-bad.org/tutorials/02.html#operation-group
