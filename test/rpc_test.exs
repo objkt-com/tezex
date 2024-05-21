@@ -19,95 +19,12 @@ defmodule Tezex.RpcTest do
     assert is_integer(counter)
   end
 
-  # test "build_contract_operation" do
-  #   rpc = %Rpc{endpoint: @endpoint}
-  #   public_key_hash = "tz1b9kV41KV9N3sp69ycLdSoZ2Ak8jXwtNPv"
-  #   encoded_private_key = "edsk4TjJWEszkHKono7XMnepVqwi37FrpbVt1KCsifJeAGimxheShG"
-  #   counter = Rpc.get_next_counter_for_account(rpc, public_key_hash)
-
-  #   contract = "KT1MFWsAXGUZ4gFkQnjByWjrrVtuQi4Tya8G"
-  #   entrypoint = "offer"
-  #   gas_limit = 1000
-  #   storage_limit = 1000
-  #   fee = 1000
-  #   amount = 1
-
-  #   price = 100
-  #   fa_contract = "KT1JzqDsR2eMqhu76uRqAUEuTWj7bbwqa9wY"
-  #   token_id = "5"
-  #   royalty_address = public_key_hash
-  #   royalty_share = 1000
-
-  #   parameters = %{
-  #     prim: "Pair",
-  #     args: [
-  #       %{
-  #         prim: "Pair",
-  #         args: [%{string: fa_contract}, %{prim: "Some", args: [%{int: token_id}]}]
-  #       },
-  #       %{
-  #         prim: "Pair",
-  #         args: [
-  #           %{prim: "Right", args: [%{prim: "Right", args: [%{prim: "Unit"}]}]},
-  #           %{
-  #             prim: "Pair",
-  #             args: [
-  #               %{int: Integer.to_string(price)},
-  #               %{
-  #                 prim: "Pair",
-  #                 args: [
-  #                   [
-  #                     %{
-  #                       prim: "Elt",
-  #                       args: [
-  #                         %{string: royalty_address},
-  #                         %{int: Integer.to_string(royalty_share)}
-  #                       ]
-  #                     }
-  #                   ],
-  #                   %{
-  #                     prim: "Pair",
-  #                     args: [
-  #                       %{prim: "None"},
-  #                       %{
-  #                         prim: "Pair",
-  #                         args: [[], %{prim: "Pair", args: [%{prim: "None"}, %{prim: "None"}]}]
-  #                       }
-  #                     ]
-  #                   }
-  #                 ]
-  #               }
-  #             ]
-  #           }
-  #         ]
-  #       }
-  #     ]
-  #   }
-
-  #   Rpc.build_contract_operation(
-  #     rpc,
-  #     public_key_hash,
-  #     counter,
-  #     contract,
-  #     amount,
-  #     fee,
-  #     storage_limit,
-  #     gas_limit,
-  #     entrypoint,
-  #     parameters,
-  #     encoded_private_key
-  #   )
-  # end
-
-  test "prepare_operation" do
+  test "prepare_operation/4" do
     contents = [
       %{
         "amount" => "100",
         "destination" => @ghostnet_2_address,
-        "fee" => "349",
-        "gas_limit" => "186",
-        "kind" => "transaction",
-        "storage_limit" => "0"
+        "kind" => "transaction"
       }
     ]
 
@@ -137,70 +54,394 @@ defmodule Tezex.RpcTest do
              )
   end
 
-  @tag :tezos
-  test "fill_operation_fee" do
-    rpc = %Rpc{endpoint: @endpoint}
-
-    contents = [
-      %{
-        "amount" => "100",
-        "destination" => @ghostnet_2_address,
-        "fee" => "349",
-        "gas_limit" => "186",
-        "kind" => "transaction",
-        "storage_limit" => "0"
+  describe "fill_operation_fee/3" do
+    test "a contract operation" do
+      operation = %{
+        "contents" => [
+          %{
+            "kind" => "transaction",
+            "amount" => "1000000",
+            "destination" => "KT1MFWsAXGUZ4gFkQnjByWjrrVtuQi4Tya8G",
+            "parameters" => %{
+              "entrypoint" => "offer",
+              "value" => %{
+                "prim" => "Pair",
+                "args" => [
+                  %{
+                    "prim" => "Pair",
+                    "args" => [
+                      %{
+                        "string" => "KT1L9L24QjU4qHmej6j1G5DTqhZanPxHH5ie"
+                      },
+                      %{
+                        "prim" => "Some",
+                        "args" => [
+                          %{
+                            "int" => "0"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  %{
+                    "prim" => "Pair",
+                    "args" => [
+                      %{
+                        "prim" => "Right",
+                        "args" => [
+                          %{
+                            "prim" => "Right",
+                            "args" => [
+                              %{
+                                "prim" => "Unit"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      %{
+                        "prim" => "Pair",
+                        "args" => [
+                          %{
+                            "int" => "1000000"
+                          },
+                          %{
+                            "prim" => "Pair",
+                            "args" => [
+                              [
+                                %{
+                                  "prim" => "Elt",
+                                  "args" => [
+                                    %{
+                                      "string" => @ghostnet_1_address
+                                    },
+                                    %{
+                                      "int" => "1000"
+                                    }
+                                  ]
+                                }
+                              ],
+                              %{
+                                "prim" => "Pair",
+                                "args" => [
+                                  %{
+                                    "prim" => "None"
+                                  },
+                                  %{
+                                    "prim" => "Pair",
+                                    "args" => [
+                                      [],
+                                      %{
+                                        "prim" => "Pair",
+                                        "args" => [
+                                          %{
+                                            "prim" => "None"
+                                          },
+                                          %{
+                                            "prim" => "None"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
       }
-    ]
 
-    {:ok, block_head} = Rpc.get_block_at_offset(rpc, 0)
-    branch = binary_part(block_head["hash"], 0, 51)
-    counter = Rpc.get_next_counter_for_account(rpc, @ghostnet_1_address)
+      operation_result = [
+        %{
+          "amount" => "1000000",
+          "counter" => "26949360",
+          "destination" => "KT1MFWsAXGUZ4gFkQnjByWjrrVtuQi4Tya8G",
+          "fee" => "0",
+          "gas_limit" => "1040000",
+          "kind" => "transaction",
+          "metadata" => %{
+            "operation_result" => %{
+              "consumed_milligas" => "2318760",
+              "paid_storage_size_diff" => "189",
+              "status" => "applied",
+              "storage_size" => "110701"
+            }
+          },
+          "parameters" => %{
+            "entrypoint" => "offer",
+            "value" => %{
+              "args" => [
+                %{
+                  "args" => [
+                    %{"string" => "KT1L9L24QjU4qHmej6j1G5DTqhZanPxHH5ie"},
+                    %{"args" => [%{"int" => "0"}], "prim" => "Some"}
+                  ],
+                  "prim" => "Pair"
+                },
+                %{
+                  "args" => [
+                    %{
+                      "args" => [
+                        %{"args" => [%{"prim" => "Unit"}], "prim" => "Right"}
+                      ],
+                      "prim" => "Right"
+                    },
+                    %{
+                      "args" => [
+                        %{"int" => "1000000"},
+                        %{
+                          "args" => [
+                            [
+                              %{
+                                "args" => [
+                                  %{
+                                    "string" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew"
+                                  },
+                                  %{"int" => "1000"}
+                                ],
+                                "prim" => "Elt"
+                              }
+                            ],
+                            %{
+                              "args" => [
+                                %{"prim" => "None"},
+                                %{
+                                  "args" => [
+                                    [],
+                                    %{
+                                      "args" => [
+                                        %{"prim" => "None"},
+                                        %{"prim" => "None"}
+                                      ],
+                                      "prim" => "Pair"
+                                    }
+                                  ],
+                                  "prim" => "Pair"
+                                }
+                              ],
+                              "prim" => "Pair"
+                            }
+                          ],
+                          "prim" => "Pair"
+                        }
+                      ],
+                      "prim" => "Pair"
+                    }
+                  ],
+                  "prim" => "Pair"
+                }
+              ],
+              "prim" => "Pair"
+            }
+          },
+          "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
+          "storage_limit" => "60000"
+        }
+      ]
 
-    operation =
-      Rpc.prepare_operation(
-        contents,
-        @ghostnet_1_address,
-        counter,
-        branch
-      )
+      assert %{
+               "contents" => [
+                 %{
+                   "amount" => "1000000",
+                   "counter" => "26949360",
+                   "destination" => "KT1MFWsAXGUZ4gFkQnjByWjrrVtuQi4Tya8G",
+                   "fee" => "649",
+                   "gas_limit" => "2419",
+                   "kind" => "transaction",
+                   "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
+                   "storage_limit" => "189"
+                 }
+               ]
+             } =
+               Rpc.fill_operation_fee(operation, operation_result)
+    end
 
-    assert %{
-             "branch" => branch,
-             "contents" => [
-               %{
-                 "amount" => "100",
-                 "counter" => "26949355",
-                 "destination" => "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B",
-                 "fee" => "287",
-                 "gas_limit" => "269",
-                 "kind" => "transaction",
-                 "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
-                 "storage_limit" => "0"
-               }
-             ]
-           } ==
-             Rpc.fill_operation_fee(rpc, operation, @ghostnet_1_pkey, branch, [])
+    test "a transfer" do
+      operation = %{
+        "contents" => [
+          %{
+            "amount" => "100",
+            "counter" => "1",
+            "destination" => "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B",
+            "fee" => "0",
+            "gas_limit" => "0",
+            "kind" => "transaction",
+            "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
+            "storage_limit" => "0"
+          }
+        ]
+      }
+
+      operation_result = [
+        %{
+          "amount" => "100",
+          "counter" => "1",
+          "destination" => "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B",
+          "fee" => "0",
+          "gas_limit" => "1451",
+          "kind" => "transaction",
+          "metadata" => %{
+            "operation_result" => %{
+              "consumed_milligas" => "168721",
+              "status" => "applied"
+            }
+          },
+          "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
+          "storage_limit" => "257"
+        }
+      ]
+
+      assert %{
+               "contents" => [
+                 %{
+                   "amount" => "100",
+                   "fee" => "284",
+                   "gas_limit" => "269",
+                   "storage_limit" => "0"
+                 }
+               ]
+             } =
+               Rpc.fill_operation_fee(operation, operation_result)
+    end
   end
 
-  @tag :tezos
-  test "inject an operation" do
-    rpc = %Rpc{endpoint: @endpoint}
+  describe "send_operation/4" do
+    @describetag :tezos
 
-    contents = [
-      %{
-        "amount" => "100",
-        "destination" => @ghostnet_2_address,
-        "fee" => "349",
-        "gas_limit" => "186",
-        "kind" => "transaction",
-        "storage_limit" => "0"
-      }
-    ]
+    test "a contract operation" do
+      rpc = %Rpc{endpoint: @endpoint}
 
-    assert {:ok, operation_id} =
-             Rpc.send_operation(rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)
+      contents = [
+        %{
+          "kind" => "transaction",
+          "amount" => "1000000",
+          "destination" => "KT1MFWsAXGUZ4gFkQnjByWjrrVtuQi4Tya8G",
+          "parameters" => %{
+            "entrypoint" => "offer",
+            "value" => %{
+              "prim" => "Pair",
+              "args" => [
+                %{
+                  "prim" => "Pair",
+                  "args" => [
+                    %{
+                      "string" => "KT1L9L24QjU4qHmej6j1G5DTqhZanPxHH5ie"
+                    },
+                    %{
+                      "prim" => "Some",
+                      "args" => [
+                        %{
+                          "int" => "0"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                %{
+                  "prim" => "Pair",
+                  "args" => [
+                    %{
+                      "prim" => "Right",
+                      "args" => [
+                        %{
+                          "prim" => "Right",
+                          "args" => [
+                            %{
+                              "prim" => "Unit"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    %{
+                      "prim" => "Pair",
+                      "args" => [
+                        %{
+                          "int" => "1000000"
+                        },
+                        %{
+                          "prim" => "Pair",
+                          "args" => [
+                            [
+                              %{
+                                "prim" => "Elt",
+                                "args" => [
+                                  %{
+                                    "string" => @ghostnet_1_address
+                                  },
+                                  %{
+                                    "int" => "1000"
+                                  }
+                                ]
+                              }
+                            ],
+                            %{
+                              "prim" => "Pair",
+                              "args" => [
+                                %{
+                                  "prim" => "None"
+                                },
+                                %{
+                                  "prim" => "Pair",
+                                  "args" => [
+                                    [],
+                                    %{
+                                      "prim" => "Pair",
+                                      "args" => [
+                                        %{
+                                          "prim" => "None"
+                                        },
+                                        %{
+                                          "prim" => "None"
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
 
-    assert is_binary(operation_id)
+      assert {:ok, operation_id} =
+               Rpc.send_operation(rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)
+
+      assert is_binary(operation_id)
+    end
+
+    test "a transfer" do
+      rpc = %Rpc{endpoint: @endpoint}
+
+      contents = [
+        %{
+          "amount" => "100",
+          "destination" => @ghostnet_2_address,
+          "kind" => "transaction"
+        }
+      ]
+
+      assert {:ok, operation_id} =
+               Rpc.send_operation(rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)
+
+      assert is_binary(operation_id)
+    end
   end
 
   test "raise" do
@@ -210,10 +451,7 @@ defmodule Tezex.RpcTest do
       %{
         "amount" => "1000000000",
         "destination" => @ghostnet_2_address,
-        "fee" => "349",
-        "gas_limit" => "186",
-        "kind" => "transaction",
-        "storage_limit" => "0"
+        "kind" => "transaction"
       }
     ]
 

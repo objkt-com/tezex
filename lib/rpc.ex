@@ -33,17 +33,8 @@ defmodule Tezex.Rpc do
     }
   end
 
-  def fill_operation_fee(%Rpc{} = rpc, operation, encoded_private_key, branch, opts) do
+  def fill_operation_fee(operation, operation_result, opts \\ []) do
     storage_limit = Keyword.get(opts, :storage_limit)
-
-    {:ok, %{"protocol" => protocol}} = get(rpc, "/blocks/#{branch}/protocols")
-
-    forged_operation = ForgeOperation.operation_group(operation)
-
-    signature = Crypto.sign_operation(encoded_private_key, forged_operation)
-
-    {:ok, [%{"contents" => operation_result}]} =
-      preapply_operation(rpc, operation, signature, protocol)
 
     applied? =
       Enum.all?(operation_result, &(&1["metadata"]["operation_result"]["status"] == "applied"))
@@ -117,12 +108,17 @@ defmodule Tezex.Rpc do
     offset = Keyword.get(opts, :offset, 0)
 
     {:ok, block_head} = get_block_at_offset(rpc, offset)
+
     branch = binary_part(block_head["hash"], 0, 51)
+    protocol = block_head["protocol"]
 
     counter = get_next_counter_for_account(rpc, wallet_address)
     operation = prepare_operation(contents, wallet_address, counter, branch)
 
-    operation = fill_operation_fee(rpc, operation, encoded_private_key, branch, opts)
+    {:ok, [%{"contents" => operation_result}]} =
+      preapply_operation(rpc, operation, encoded_private_key, protocol)
+
+    operation = fill_operation_fee(operation, operation_result, opts)
 
     forged_operation = ForgeOperation.operation_group(operation)
 
@@ -188,7 +184,11 @@ defmodule Tezex.Rpc do
   @doc """
   Simulate the application of the operations with the context of the given block and return the result of each operation application.
   """
-  def preapply_operation(%Rpc{} = rpc, operation, signature, protocol) do
+  def preapply_operation(%Rpc{} = rpc, operation, encoded_private_key, protocol) do
+    forged_operation = ForgeOperation.operation_group(operation)
+
+    signature = Crypto.sign_operation(encoded_private_key, forged_operation)
+
     payload = [Map.merge(operation, %{"signature" => signature, "protocol" => protocol})]
 
     post(rpc, "/blocks/head/helpers/preapply/operations", payload)
