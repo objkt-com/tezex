@@ -12,11 +12,9 @@ defmodule Tezex.Fee do
 
   # size of serialized branch and signature + safe reserve
   @extra_size 32 + 64
-
   def extra_size, do: @extra_size
 
   @default_gas_reserve 100
-
   def default_gas_reserve, do: @default_gas_reserve
 
   @spec calculate_fee(map(), pos_integer(),
@@ -57,7 +55,7 @@ defmodule Tezex.Fee do
         @hard_gas_limit_per_operation
 
       "transaction" ->
-        if String.starts_with?(content["destination"], "KT"),
+        if originated_account?(content["destination"]),
           do: @hard_gas_limit_per_operation,
           else: @default_transaction_gas_limit
     end
@@ -75,7 +73,7 @@ defmodule Tezex.Fee do
         @hard_storage_limit_per_operation
 
       "transaction" ->
-        if String.starts_with?(content["destination"], "KT"),
+        if originated_account?(content["destination"]),
           do: @hard_storage_limit_per_operation,
           else: @default_transaction_storage_limit
 
@@ -84,4 +82,7 @@ defmodule Tezex.Fee do
         @hard_storage_limit_per_operation
     end
   end
+
+  defp originated_account?("KT1" <> _), do: true
+  defp originated_account?(_), do: false
 end
