@@ -1,7 +1,7 @@
 defmodule Tezex.MixProject do
   use Mix.Project
 
-  @version "2.0.0-rc.0"
+  @version "2.0.0-rc.1"
   @url_docs "http://hexdocs.pm/tezex"
   @url_github "https://github.com/objkt-com/tezex"
 
@@ -73,7 +73,7 @@ defmodule Tezex.MixProject do
       {:finch, "~> 0.10"},
       {:jason, "~> 1.4"},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
-      {:ssl_verify_fun, "~> 1.1", manager: :rebar3, override: true}
+      {:ssl_verify_fun, "~> 1.1.0", [env: :prod, hex: "ssl_verify_fun", repo: "hexpm"]}
     ]
   end
 end
