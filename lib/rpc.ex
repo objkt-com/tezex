@@ -85,10 +85,8 @@ defmodule Tezex.Rpc do
 
           content = Map.drop(content, ~w(metadata))
 
-          fee =
-            Fee.calculate_fee(content, gas_limit_new,
-              extra_size: 1 + div(Fee.extra_size(), number_contents)
-            )
+          extra_size = 1 + div(Fee.extra_size(), number_contents)
+          fee = Fee.calculate_fee(content, gas_limit_new, extra_size: extra_size)
 
           %{
             content
