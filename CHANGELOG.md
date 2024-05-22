@@ -4,6 +4,9 @@
 
 - [BREAKING]: `Tezex.Micheline` now only takes care of `PACK`ing and `UNPACK`ing, forging and unforging is now in `Tezex.Forge`
 - [BREAKING]: `Tezex.Micheline.Zarith` is replaced with `Tezex.Zarith`
+- [crypto] add a pure Elixir [HMAC-DRBG](https://hexdocs.pm/tezex/Tezex.Crypto.HMACDRBG.html) implementation
+- [crypto] implement message/operations [signing](https://hexdocs.pm/tezex/Tezex.Crypto.html#sign_message/2)
+- implement (un)forging [micheline](https://hexdocs.pm/tezex/Tezex.Forge.html), [operations/operation groups](https://hexdocs.pm/tezex/Tezex.ForgeOperation.html), [calculating gas/storage/fees](https://hexdocs.pm/tezex/Tezex.Fee.html) and [sending them to Tezos RPC nodes](https://hexdocs.pm/tezex/Tezex.Rpc.html).
 
 ## v1.2.0
 

@@ -54,7 +54,7 @@ defmodule Tezex.RpcTest do
              )
   end
 
-  test "injection_payload/2" do
+  test "forge_and_sign_operation/2" do
     operation = %{
       "branch" => "BLWdshvgEYbtUaABnmqkMuyMezpfsu36DEJPDJN63CW3TFuk7bP",
       "contents" => [
@@ -74,7 +74,7 @@ defmodule Tezex.RpcTest do
     result =
       "6940b2318870c4b84862aef187c1bbcd4138170459e85092fe34be5d179f40ac6c00980d7cebb50d4b83a4e3307b3ca1b40ebe8f71ab00e308ab0b8102640000b75f0c30536bee108b068d90b151ce846aca11b1009bc207291f08c7117ea3a341328a036ce7bd5da996d9148cc491f96c3097748d7adcdb60599504ae5227aea4a6e69d536baaf96ae2bbb6c261a69d000b323f0a"
 
-    assert result == Rpc.injection_payload(operation, @ghostnet_1_pkey)
+    assert result == Rpc.forge_and_sign_operation(operation, @ghostnet_1_pkey)
   end
 
   describe "fill_operation_fee/3" do
