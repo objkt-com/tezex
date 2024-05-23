@@ -1,6 +1,6 @@
 defmodule Tezex.CryptoTest do
   use ExUnit.Case, async: true
-  doctest Tezex.Crypto
+  doctest Tezex.Crypto, import: true
 
   alias Tezex.Crypto
   alias Tezex.Micheline

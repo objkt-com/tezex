@@ -59,4 +59,12 @@ defmodule Tezex.Crypto.Base58Check do
 
   @spec decode58check!(binary) :: binary
   defdelegate decode58check!(encoded), to: Base58Check
+
+  def decode58check(encoded) do
+    try do
+      {:ok, decode58check!(encoded)}
+    rescue
+      _e in FunctionClauseError -> :error
+    end
+  end
 end

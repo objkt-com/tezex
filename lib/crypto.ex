@@ -40,13 +40,13 @@ defmodule Tezex.Crypto do
       iex> signature = "spsig1ZNQaUKNERZSiEiNviqa5EAPkcNASXhfkXtxRatZTDZAnUB4Ra2Jus8b1oEpFnPx8Z6g28pd8vK3R8nPK29JDU5FiSLH5T"
       iex> message = "05010000007154657a6f73205369676e6564204d6573736167653a207369676e206d6520696e20617320747a32424338337076454161673672325a56376b5067684e41626a466f69716843765a78206f6e206f626a6b742e636f6d20617420323032312d31302d30345431383a35393a31332e3939305a"
       iex> public_key = "sppk7aBerAEA6tv4wzg6FnK7i5YrGtEGFVvNjWhc2QX8bhzpouBVFSW"
-      iex> Tezex.Crypto.check_signature(address, signature, message, public_key)
+      iex> check_signature(address, signature, message, public_key)
       :ok
-      iex> Tezex.Crypto.check_signature(address_b, signature, message, public_key)
+      iex> check_signature(address_b, signature, message, public_key)
       {:error, :address_mismatch}
-      iex> Tezex.Crypto.check_signature(address, signature, "", public_key)
+      iex> check_signature(address, signature, "", public_key)
       {:error, :bad_signature}
-      iex> Tezex.Crypto.check_signature(address, "x" <> signature, "", public_key)
+      iex> check_signature(address, "x" <> signature, "", public_key)
       {:error, :invalid_signature}
   """
   @spec check_signature(binary, binary, binary, binary) ::
@@ -121,16 +121,60 @@ defmodule Tezex.Crypto do
     {:error, :invalid_pubkey_format}
   end
 
+  defp check_checksum(checksum, data) do
+    computed_checksum =
+      :crypto.hash(:sha256, :crypto.hash(:sha256, data))
+      |> binary_part(0, 4)
+
+    if computed_checksum == checksum do
+      :ok
+    else
+      {:error, :invalid_checksum}
+    end
+  end
+
+  @doc """
+  Validate an implicit account address
+
+  ## Examples
+
+  iex> validate_address("tz1L9r8mWmRpndRhuvMCWESLGSVeFzQ9NAWx")
+  {:error, :invalid_checksum}
+  iex> validate_address("tz3bPFa6mGv8m4Ppn7w5KSD00bEPwbJNpC9p")
+  {:error, :invalid_base58}
+  iex> validate_address("tz1L9r8mWmRpndRhuvMCWESLGSVeFz")
+  {:error, :invalid_length}
+  iex> validate_address("tp3bPFa6mGv8m4Ppn7w5KSDyAbEPwbJNpC9p")
+  {:error, :invalid_prefix}
+  iex> validate_address("tz3bPFa6mGv8m4Ppn7w5KSDyAbEPwbJNpC9p")
+  :ok
+  """
+  @spec validate_address(nonempty_binary()) ::
+          :ok | {:error, :invalid_base58 | :invalid_checksum | :invalid_length | :invalid_prefix}
+  def validate_address(address) do
+    with {:ok, decoded} <- Base58Check.decode58(address),
+         <<prefix::binary-size(3), pkh::binary-size(20), checksum::binary-size(4)>> <- decoded,
+         true <- prefix in [@prefix_tz1, @prefix_tz2, @prefix_tz3],
+         :ok <- check_checksum(checksum, <<prefix::binary-size(3), pkh::binary-size(20)>>) do
+      :ok
+    else
+      :error -> {:error, :invalid_base58}
+      {:error, :invalid_checksum} -> {:error, :invalid_checksum}
+      false -> {:error, :invalid_prefix}
+      b when is_binary(b) -> {:error, :invalid_length}
+    end
+  end
+
   @doc """
   Verify that `address` is the public key hash of `pubkey`.
 
   ## Examples
       iex> pubkey = "sppk7aBerAEA6tv4wzg6FnK7i5YrGtEGFVvNjWhc2QX8bhzpouBVFSW"
-      iex> Tezex.Crypto.check_address("tz2BC83pvEAag6r2ZV7kPghNAbjFoiqhCvZx", pubkey)
+      iex> check_address("tz2BC83pvEAag6r2ZV7kPghNAbjFoiqhCvZx", pubkey)
       :ok
-      iex> Tezex.Crypto.check_address("tz1burnburnburnburnburnburnburjAYjjX", pubkey)
+      iex> check_address("tz1burnburnburnburnburnburnburjAYjjX", pubkey)
       {:error, :address_mismatch}
-      iex> Tezex.Crypto.check_address("tz2BC83pvEAag6r2ZV7kPghNAbjFoiqhCvZx", "x" <> pubkey)
+      iex> check_address("tz2BC83pvEAag6r2ZV7kPghNAbjFoiqhCvZx", "x" <> pubkey)
       {:error, :invalid_pubkey_format}
   """
   @spec check_address(nonempty_binary, nonempty_binary) ::
@@ -147,15 +191,15 @@ defmodule Tezex.Crypto do
   Derive public key hash (Tezos wallet address) from public key
 
   ## Examples
-      iex> Tezex.Crypto.derive_address("edpktsPhZ8weLEXqf4Fo5FS9Qx8ZuX4QpEBEwe63L747G8iDjTAF6w")
+      iex> derive_address("edpktsPhZ8weLEXqf4Fo5FS9Qx8ZuX4QpEBEwe63L747G8iDjTAF6w")
       {:ok, "tz1LKpeN8ZSSFNyTWiBNaE4u4sjaq7J1Vz2z"}
-      iex> Tezex.Crypto.derive_address("sppk7aBerAEA6tv4wzg6FnK7i5YrGtEGFVvNjWhc2QX8bhzpouBVFSW")
+      iex> derive_address("sppk7aBerAEA6tv4wzg6FnK7i5YrGtEGFVvNjWhc2QX8bhzpouBVFSW")
       {:ok, "tz2BC83pvEAag6r2ZV7kPghNAbjFoiqhCvZx"}
-      iex> Tezex.Crypto.derive_address("p2pk65yRxCX65k6qRPrbqGWvfW5JnLB1p3dn1oM5o9cyqLKPPhJaBMa")
+      iex> derive_address("p2pk65yRxCX65k6qRPrbqGWvfW5JnLB1p3dn1oM5o9cyqLKPPhJaBMa")
       {:ok, "tz3bPFa6mGv8m4Ppn7w5KSDyAbEPwbJNpC9p"}
-      iex> Tezex.Crypto.derive_address("_p2pk65yRxCX65k6qRPrbqGWvfW5JnLB1p3dn1oM5o9cyqLKPPhJaBMa")
+      iex> derive_address("_p2pk65yRxCX65k6qRPrbqGWvfW5JnLB1p3dn1oM5o9cyqLKPPhJaBMa")
       {:error, :invalid_pubkey_format}
-      iex> Tezex.Crypto.derive_address("p2pk65yRxCX65k6")
+      iex> derive_address("p2pk65yRxCX65k6")
       {:error, :invalid_pubkey_format}
   """
   @spec derive_address(nonempty_binary) ::
@@ -191,9 +235,9 @@ defmodule Tezex.Crypto do
   Encode a raw public key
 
   ## Examples
-      iex> Tezex.Crypto.encode_pubkey("tz1LPggcEZincSDQJUXrskwJPif4aJhWxMjd", "52d396892b2489ec91406f83680b172b5ca42f606128cd4c44ea4d09d31aa524")
+      iex> encode_pubkey("tz1LPggcEZincSDQJUXrskwJPif4aJhWxMjd", "52d396892b2489ec91406f83680b172b5ca42f606128cd4c44ea4d09d31aa524")
       {:ok, "edpkuGhdSSNgqT92Gwoxt9vV3TmpQE93TtQSn5kkyULCh7cfeQFTno"}
-      iex> Tezex.Crypto.encode_pubkey("tz1LPggcEZincSDQJUXrskwJPif4aJhWxMjd", "foo")
+      iex> encode_pubkey("tz1LPggcEZincSDQJUXrskwJPif4aJhWxMjd", "foo")
       :error
   """
   @spec encode_pubkey(nonempty_binary, nonempty_binary) :: :error | {:ok, nonempty_binary}
@@ -253,11 +297,11 @@ defmodule Tezex.Crypto do
 
   ## Examples
       iex> encoded_private_key = "spsk24EJohZHJkZnWEzj3w9wE7BFARpFmq5WAo9oTtqjdJ2t4pyoB3"
-      iex> Tezex.Crypto.sign_message(encoded_private_key, "foo")
+      iex> sign_message(encoded_private_key, "foo")
       "spsig1Uyadmsz75zND5qDjSAteir1NGCEuPaxNnT8QmXkwCJkuzWUyxKqKsjSx3nU4uj2nk8t31VFFhQ4YsPKdZ9ghA2d2fe9HF"
       iex> msg = Tezex.Micheline.pack("foo", :string)
       "050100000003666f6f"
-      iex> Tezex.Crypto.sign_message(encoded_private_key, msg)
+      iex> sign_message(encoded_private_key, msg)
       "spsig1Uyadmsz75zND5qDjSAteir1NGCEuPaxNnT8QmXkwCJkuzWUyxKqKsjSx3nU4uj2nk8t31VFFhQ4YsPKdZ9ghA2d2fe9HF"
   """
   @spec sign_message(privkey_param(), binary()) :: nonempty_binary()
