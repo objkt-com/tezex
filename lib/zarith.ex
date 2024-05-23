@@ -14,10 +14,10 @@ defmodule Tezex.Zarith do
   Takes a binary and returns the integer in base 10.
 
   ## Examples
-      iex> Tezex.Zarith.decode("a1d22c")
+      iex> decode("a1d22c")
       365_729
 
-      iex> Tezex.Zarith.decode("e1d22c")
+      iex> decode("e1d22c")
       -365_729
   """
   @spec decode(nonempty_binary()) :: integer()
@@ -33,10 +33,10 @@ defmodule Tezex.Zarith do
   Implementation based on [anchorageoss/tezosprotocol (MIT License - Copyright (c) 2019 Anchor Labs, Inc.)](https://github.com/anchorageoss/tezosprotocol/blob/23a051d34fcfda8393940141f8151113a1aca10b/zarith/zarith.go#L153)
 
   ## Examples
-      iex> Tezex.Zarith.encode(365_729)
+      iex> encode(365_729)
       "a1d22c"
 
-      iex> Tezex.Zarith.encode(-365_729)
+      iex> encode(-365_729)
       "e1d22c"
   """
   @spec encode(integer()) :: nonempty_binary()

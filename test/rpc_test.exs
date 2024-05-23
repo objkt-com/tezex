@@ -2,7 +2,7 @@ defmodule Tezex.RpcTest do
   use ExUnit.Case, async: true
 
   alias Tezex.Rpc
-  doctest Tezex.Rpc
+  doctest Tezex.Rpc, import: true
 
   @endpoint "https://ghostnet.tezos.marigold.dev/"
   @ghostnet_1_address "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew"

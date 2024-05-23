@@ -2,7 +2,7 @@ defmodule Tezex.ZarithTest do
   use ExUnit.Case, async: true
 
   alias Tezex.Zarith
-  doctest Zarith
+  doctest Zarith, import: true
 
   test "encode/decode" do
     n = 1_000_000_000_000

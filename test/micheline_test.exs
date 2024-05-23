@@ -4,7 +4,7 @@ defmodule Tezex.MichelineTest do
   alias Tezex.Forge
   alias Tezex.Micheline
 
-  doctest Tezex.Micheline
+  doctest Tezex.Micheline, import: true
 
   describe "pack" do
     result = Micheline.pack(9, :int)

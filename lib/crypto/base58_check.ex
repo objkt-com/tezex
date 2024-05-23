@@ -10,7 +10,7 @@ defmodule Tezex.Crypto.Base58Check do
   Prepends `prefix` to `payload`, computes its checksum (double sha256) and encodes in Base58.
 
   ## Examples
-      iex> Tezex.Crypto.Base58Check.encode(<<165, 37, 29, 103, 204, 101, 232, 200, 87, 148, 178, 91, 43, 72, 191, 252, 190, 134, 75, 170>>, <<6, 161, 164>>)
+      iex> encode(<<165, 37, 29, 103, 204, 101, 232, 200, 87, 148, 178, 91, 43, 72, 191, 252, 190, 134, 75, 170>>, <<6, 161, 164>>)
       "tz3bPFa6mGv8m4Ppn7w5KSDyAbEPwbJNpC9p"
   """
   @spec encode(binary, binary) :: nonempty_binary
@@ -45,13 +45,13 @@ defmodule Tezex.Crypto.Base58Check do
   Decodes the given string.
 
   ## Examples
-      iex> Tezex.Crypto.Base58Check.decode58!("1")
+      iex> decode58!("1")
       <<0>>
-      iex> Tezex.Crypto.Base58Check.decode58!("z")
+      iex> decode58!("z")
       <<57>>
-      iex> Tezex.Crypto.Base58Check.decode58!("Jf")
+      iex> decode58!("Jf")
       :binary.encode_unsigned(1024)
-      iex> Tezex.Crypto.Base58Check.decode58!("BukQL")
+      iex> decode58!("BukQL")
       :binary.encode_unsigned(123_456_789)
   """
   @spec decode58!(binary) :: binary
@@ -59,12 +59,4 @@ defmodule Tezex.Crypto.Base58Check do
 
   @spec decode58check!(binary) :: binary
   defdelegate decode58check!(encoded), to: Base58Check
-
-  def decode58check(encoded) do
-    try do
-      {:ok, decode58check!(encoded)}
-    rescue
-      _e in FunctionClauseError -> :error
-    end
-  end
 end

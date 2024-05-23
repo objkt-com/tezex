@@ -159,11 +159,11 @@ defmodule Tezex.Rpc do
     forged_operation <> payload_signature
   end
 
-  @spec preapply_operation(t(), map(), encoded_private_key(), any()) ::
-          {:ok, any()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
   @doc """
   Simulate the application of the operations with the context of the given block and return the result of each operation application.
   """
+  @spec preapply_operation(t(), map(), encoded_private_key(), any()) ::
+          {:ok, any()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
   def preapply_operation(%Rpc{} = rpc, operation, encoded_private_key, protocol) do
     forged_operation = ForgeOperation.operation_group(operation)
     signature = Crypto.sign_operation(encoded_private_key, forged_operation)
@@ -184,23 +184,21 @@ defmodule Tezex.Rpc do
     end
   end
 
+  @spec get_next_counter_for_account(t(), nonempty_binary()) :: integer()
   def get_next_counter_for_account(%Rpc{} = rpc, address) do
     get_counter_for_account(rpc, address) + 1
   end
 
   @spec get_block(t()) ::
-          {:error, %{:__exception__ => true, :__struct__ => atom(), optional(atom()) => any()}}
-          | {:ok, any()}
-  @spec get_block(t(), any()) ::
-          {:error, %{:__exception__ => true, :__struct__ => atom(), optional(atom()) => any()}}
-          | {:ok, any()}
+          {:ok, map()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
+  @spec get_block(t(), nonempty_binary()) ::
+          {:ok, map()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
   def get_block(%Rpc{} = rpc, hash \\ "head") do
     get(rpc, "/blocks/#{hash}")
   end
 
-  @spec get_block_at_offset(t(), number()) ::
-          {:error, %{:__exception__ => true, :__struct__ => atom(), optional(atom()) => any()}}
-          | {:ok, any()}
+  @spec get_block_at_offset(t(), integer()) ::
+          {:ok, map()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
   def get_block_at_offset(%Rpc{} = rpc, offset) do
     if offset <= 0 do
       get_block(rpc)
@@ -211,8 +209,7 @@ defmodule Tezex.Rpc do
   end
 
   @spec inject_operation(t(), any()) ::
-          {:error, %{:__exception__ => true, :__struct__ => atom(), optional(atom()) => any()}}
-          | {:ok, any()}
+          {:ok, any()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
   def inject_operation(%Rpc{} = rpc, payload) do
     post(rpc, "/injection/operation", payload)
   end

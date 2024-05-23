@@ -11,9 +11,9 @@ defmodule Tezex.Micheline do
   Serialize a piece of data to its optimized binary representation.
 
   ## Examples
-      iex> Micheline.pack(-6407, :int)
+      iex> pack(-6407, :int)
       "0500c764"
-      iex> Micheline.pack(%{"prim" => "Pair", "args" => [%{"int" => "-33"}, %{"int" => "71"}]})
+      iex> pack(%{"prim" => "Pair", "args" => [%{"int" => "-33"}, %{"int" => "71"}]})
       "0507070061008701"
   """
   @spec pack(binary() | integer() | map(), pack_types()) :: nonempty_binary()
@@ -51,9 +51,9 @@ defmodule Tezex.Micheline do
   Deserialize a piece of data from its optimized binary representation.
 
   ## Examples
-      iex> Micheline.unpack("050a0000001601e67bac124dff100a57644de0cf26d341ebf9492600", :address)
+      iex> unpack("050a0000001601e67bac124dff100a57644de0cf26d341ebf9492600", :address)
       "KT1VbT8n6YbrzPSjdAscKfJGDDNafB5yHn1H"
-      iex> Micheline.unpack("0507070001000c")
+      iex> unpack("0507070001000c")
       %{"prim" => "Pair", "args" => [%{"int" => "1"}, %{"int" => "12"}]}
   """
   @type unpack_result :: binary() | integer() | map() | list(unpack_result())
