@@ -137,17 +137,16 @@ defmodule Tezex.Crypto do
   Validate an implicit account address
 
   ## Examples
-
-  iex> validate_address("tz1L9r8mWmRpndRhuvMCWESLGSVeFzQ9NAWx")
-  {:error, :invalid_checksum}
-  iex> validate_address("tz3bPFa6mGv8m4Ppn7w5KSD00bEPwbJNpC9p")
-  {:error, :invalid_base58}
-  iex> validate_address("tz1L9r8mWmRpndRhuvMCWESLGSVeFz")
-  {:error, :invalid_length}
-  iex> validate_address("tp3bPFa6mGv8m4Ppn7w5KSDyAbEPwbJNpC9p")
-  {:error, :invalid_prefix}
-  iex> validate_address("tz3bPFa6mGv8m4Ppn7w5KSDyAbEPwbJNpC9p")
-  :ok
+      iex> validate_address("tz1L9r8mWmRpndRhuvMCWESLGSVeFzQ9NAWx")
+      {:error, :invalid_checksum}
+      iex> validate_address("tz3bPFa6mGv8m4Ppn7w5KSD00bEPwbJNpC9p")
+      {:error, :invalid_base58}
+      iex> validate_address("tz1L9r8mWmRpndRhuvMCWESLGSVeFz")
+      {:error, :invalid_length}
+      iex> validate_address("tp3bPFa6mGv8m4Ppn7w5KSDyAbEPwbJNpC9p")
+      {:error, :invalid_prefix}
+      iex> validate_address("tz3bPFa6mGv8m4Ppn7w5KSDyAbEPwbJNpC9p")
+      :ok
   """
   @spec validate_address(nonempty_binary()) ::
           :ok | {:error, :invalid_base58 | :invalid_checksum | :invalid_length | :invalid_prefix}
