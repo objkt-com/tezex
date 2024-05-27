@@ -65,7 +65,7 @@ defmodule Tezex.Crypto.PrivateKey do
   end
 
   @doc """
-  Gets the public associated with a private key
+  Gets the public key associated with a private key
 
   Parameters:
   - `private_key` [`t:Tezex.Crypto.PrivateKey.t/0`]: private key struct

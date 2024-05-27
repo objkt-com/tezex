@@ -17,7 +17,7 @@ defmodule Tezex.Rpc do
           opts: Finch.request_opts()
         }
   @type encoded_private_key() :: <<_::32, _::_*8>>
-  @type op() :: map()
+  @type op() :: map() | list(map())
 
   defstruct [:endpoint, chain_id: "main", headers: [], opts: []]
 
