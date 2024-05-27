@@ -64,12 +64,9 @@ defmodule Tezex.Rpc do
       Enum.map(preapplied_operations, fn content ->
         if validation_passes(content["kind"]) == 3 do
           internal_consumed_milligas =
-            Enum.reduce(content["metadata"]["internal_operation_results"], 0, fn obj, sum ->
-              sum +
-                case get_in(obj, ["result", "consumed_milligas"]) do
-                  nil -> 0
-                  n -> String.to_integer(n)
-                end
+            (get_in(content, ["metadata", "internal_operation_results"]) || [])
+            |> Enum.reduce(0, fn obj, sum ->
+              sum + String.to_integer(get_in(obj, ["result", "consumed_milligas"]) || "0")
             end)
 
           consumed_milligas =

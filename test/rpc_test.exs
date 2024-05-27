@@ -9,6 +9,7 @@ defmodule Tezex.RpcTest do
   @ghostnet_1_pkey "edsk33h91RysSBUiYyEWbeRwo41YeZrtMPTNsuZ9nzsYWwiV8CFyKi"
   @ghostnet_2_address "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B"
 
+  @tag :tezos
   test "get_counter_for_account" do
     counter =
       Rpc.get_counter_for_account(
@@ -467,6 +468,7 @@ defmodule Tezex.RpcTest do
     end
   end
 
+  @tag :tezos
   test "raise" do
     rpc = %Rpc{endpoint: @endpoint}
 
