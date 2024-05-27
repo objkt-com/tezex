@@ -63,11 +63,21 @@ defmodule Tezex.Rpc do
     contents =
       Enum.map(preapplied_operations, fn content ->
         if validation_passes(content["kind"]) == 3 do
+          internal_consumed_milligas =
+            Enum.reduce(content["metadata"]["internal_operation_results"], 0, fn obj, sum ->
+              sum +
+                case get_in(obj, ["result", "consumed_milligas"]) do
+                  nil -> 0
+                  n -> String.to_integer(n)
+                end
+            end)
+
           consumed_milligas =
-            case content["metadata"]["operation_result"]["consumed_milligas"] do
-              nil -> 0
-              v -> String.to_integer(v)
-            end
+            internal_consumed_milligas +
+              case content["metadata"]["operation_result"]["consumed_milligas"] do
+                nil -> 0
+                v -> String.to_integer(v)
+              end
 
           gas_limit_new = ceil(consumed_milligas / 1000)
 
