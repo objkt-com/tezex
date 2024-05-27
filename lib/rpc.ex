@@ -17,11 +17,11 @@ defmodule Tezex.Rpc do
           opts: Finch.request_opts()
         }
   @type encoded_private_key() :: <<_::32, _::_*8>>
-  @type op() :: map() | list(map())
+  @type op() :: map()
 
   defstruct [:endpoint, chain_id: "main", headers: [], opts: []]
 
-  @spec prepare_operation(op(), nonempty_binary(), integer(), nonempty_binary()) :: op()
+  @spec prepare_operation(list(op()), nonempty_binary(), integer(), nonempty_binary()) :: op()
   def prepare_operation(contents, wallet_address, counter, branch) do
     contents =
       contents
@@ -120,7 +120,7 @@ defmodule Tezex.Rpc do
   @doc """
   Send an operation to a Tezos RPC node.
   """
-  @spec send_operation(t(), op(), nonempty_binary(), encoded_private_key()) ::
+  @spec send_operation(t(), list(op()), nonempty_binary(), encoded_private_key()) ::
           {:ok, any()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
   def send_operation(%Rpc{} = rpc, contents, wallet_address, encoded_private_key, opts \\ []) do
     offset = Keyword.get(opts, :offset, 0)
