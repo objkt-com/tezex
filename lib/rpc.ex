@@ -229,7 +229,10 @@ defmodule Tezex.Rpc do
   end
 
   @spec get(Tezex.Rpc.t(), nonempty_binary()) ::
-          {:ok, any()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
+          {:ok, any()}
+          | {:error, Finch.Error.t()}
+          | {:error, Finch.Response.t()}
+          | {:error, Jason.DecodeError.t()}
   defp get(%Rpc{} = rpc, path) do
     url =
       URI.parse(rpc.endpoint)
@@ -241,12 +244,16 @@ defmodule Tezex.Rpc do
     |> Finch.request(Tezex.Finch, rpc.opts)
     |> case do
       {:ok, %Finch.Response{status: 200, body: body}} -> Jason.decode(body)
+      {:ok, resp} -> {:error, resp}
       {:error, _} = err -> err
     end
   end
 
   @spec post(Tezex.Rpc.t(), nonempty_binary(), any()) ::
-          {:ok, any()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
+          {:ok, any()}
+          | {:error, Finch.Error.t()}
+          | {:error, Finch.Response.t()}
+          | {:error, Jason.DecodeError.t()}
   defp post(%Rpc{} = rpc, path, body) do
     url =
       URI.parse(rpc.endpoint)
@@ -269,6 +276,7 @@ defmodule Tezex.Rpc do
     |> Finch.request(Tezex.Finch, rpc.opts)
     |> case do
       {:ok, %Finch.Response{status: 200, body: body}} -> Jason.decode(body)
+      {:ok, resp} -> {:error, resp}
       {:error, _} = err -> err
     end
   end
