@@ -228,6 +228,15 @@ defmodule Tezex.Rpc do
     post(rpc, "/injection/operation", payload)
   end
 
+  @spec get_balance(t(), nonempty_binary()) ::
+          {:ok, pos_integer()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
+  def get_balance(%Rpc{} = rpc, address) do
+    case get(rpc, "/blocks/head/context/contracts/#{address}/balance") do
+      {:ok, balance} -> {:ok, String.to_integer(balance)}
+      e -> e
+    end
+  end
+
   @spec get(Tezex.Rpc.t(), nonempty_binary()) ::
           {:ok, any()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
   defp get(%Rpc{} = rpc, path) do
