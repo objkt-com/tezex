@@ -134,9 +134,10 @@ defmodule Tezex.Rpc do
   @doc """
   Send an operation to a Tezos RPC node.
   """
-  @spec send_operation(t(), list(op()), nonempty_binary(), encoded_private_key()) ::
+  @spec send_operation(t(), list(op()) | op(), nonempty_binary(), encoded_private_key()) ::
           {:ok, any()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
   def send_operation(%Rpc{} = rpc, contents, wallet_address, encoded_private_key, opts \\ []) do
+    contents = if is_map(contents), do: [contents], else: contents
     offset = Keyword.get(opts, :offset, 0)
 
     {:ok, block_head} = get_block_at_offset(rpc, offset)

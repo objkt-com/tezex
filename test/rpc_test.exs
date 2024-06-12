@@ -453,13 +453,11 @@ defmodule Tezex.RpcTest do
     test "a transfer" do
       rpc = %Rpc{endpoint: @endpoint}
 
-      contents = [
-        %{
-          "amount" => "100",
-          "destination" => @ghostnet_2_address,
-          "kind" => "transaction"
-        }
-      ]
+      contents = %{
+        "amount" => "100",
+        "destination" => @ghostnet_2_address,
+        "kind" => "transaction"
+      }
 
       assert {:ok, operation_id} =
                Rpc.send_operation(rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)
