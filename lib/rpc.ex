@@ -17,18 +17,27 @@ defmodule Tezex.Rpc do
           opts: Finch.request_opts()
         }
   @type encoded_private_key() :: <<_::32, _::_*8>>
-  @type op() :: map()
+  @type transaction() :: map()
+  @type operation() :: map()
+  @type preapplied_operations() :: map()
 
   defstruct [:endpoint, chain_id: "main", headers: [], opts: []]
 
-  @spec prepare_operation(list(op()), nonempty_binary(), integer(), nonempty_binary()) :: op()
-  def prepare_operation(contents, wallet_address, counter, branch) do
-    contents_length = length(contents)
-    hard_gas_limit_per_content = div(Fee.hard_gas_limit_per_operation(), contents_length)
-    hard_storage_limit_per_content = div(Fee.hard_storage_limit_per_operation(), contents_length)
+  @spec prepare_operation(
+          list(transaction()),
+          nonempty_binary(),
+          integer(),
+          nonempty_binary()
+        ) :: operation()
+  def prepare_operation(transactions, wallet_address, counter, branch) do
+    transactions_length = length(transactions)
+    hard_gas_limit_per_content = div(Fee.hard_gas_limit_per_operation(), transactions_length)
+
+    hard_storage_limit_per_content =
+      div(Fee.hard_storage_limit_per_operation(), transactions_length)
 
     contents =
-      contents
+      transactions
       |> Enum.with_index(counter)
       |> Enum.map(fn {content, counter} ->
         gas_limit = min(hard_gas_limit_per_content, Fee.default_gas_limit(content))
@@ -49,8 +58,9 @@ defmodule Tezex.Rpc do
     }
   end
 
-  @spec fill_operation_fee(op(), list(op()), keyword()) :: op()
-  @spec fill_operation_fee(op(), list(op())) :: op()
+  @spec fill_operation_fee(operation(), list(preapplied_operations()),
+          storage_limit: non_neg_integer()
+        ) :: operation()
   def fill_operation_fee(operation, preapplied_operations, opts \\ []) do
     storage_limit = Keyword.get(opts, :storage_limit)
 
@@ -134,10 +144,17 @@ defmodule Tezex.Rpc do
   @doc """
   Send an operation to a Tezos RPC node.
   """
-  @spec send_operation(t(), list(op()) | op(), nonempty_binary(), encoded_private_key()) ::
+  @spec send_operation(
+          t(),
+          list(transaction()) | transaction(),
+          nonempty_binary(),
+          encoded_private_key(),
+          offset: non_neg_integer(),
+          storage_limit: non_neg_integer()
+        ) ::
           {:ok, any()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
-  def send_operation(%Rpc{} = rpc, contents, wallet_address, encoded_private_key, opts \\ []) do
-    contents = if is_map(contents), do: [contents], else: contents
+  def send_operation(%Rpc{} = rpc, transactions, wallet_address, encoded_private_key, opts \\ []) do
+    transactions = if is_map(transactions), do: [transactions], else: transactions
     offset = Keyword.get(opts, :offset, 0)
 
     {:ok, block_head} = get_block_at_offset(rpc, offset)
@@ -146,7 +163,7 @@ defmodule Tezex.Rpc do
     protocol = block_head["protocol"]
 
     counter = get_next_counter_for_account(rpc, wallet_address)
-    operation = prepare_operation(contents, wallet_address, counter, branch)
+    operation = prepare_operation(transactions, wallet_address, counter, branch)
 
     {:ok, [%{"contents" => preapplied_operations}]} =
       preapply_operation(rpc, operation, encoded_private_key, protocol)
@@ -160,7 +177,7 @@ defmodule Tezex.Rpc do
   @doc """
   Sign the forged operation and returns the forged operation+signature payload to be injected.
   """
-  @spec forge_and_sign_operation(op(), encoded_private_key()) :: nonempty_binary()
+  @spec forge_and_sign_operation(operation(), encoded_private_key()) :: nonempty_binary()
   def forge_and_sign_operation(operation, encoded_private_key) do
     forged_operation = ForgeOperation.operation_group(operation)
 
