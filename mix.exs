@@ -1,7 +1,7 @@
 defmodule Tezex.MixProject do
   use Mix.Project
 
-  @version "2.0.0-rc.10"
+  @version "2.0.0-rc.11"
   @url_docs "http://hexdocs.pm/tezex"
   @url_github "https://github.com/objkt-com/tezex"
 
