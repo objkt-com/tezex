@@ -80,196 +80,7 @@ defmodule Tezex.RpcTest do
 
   describe "fill_operation_fee/3" do
     test "a contract operation" do
-      operation = %{
-        "contents" => [
-          %{
-            "kind" => "transaction",
-            "amount" => "1000000",
-            "destination" => "KT1MFWsAXGUZ4gFkQnjByWjrrVtuQi4Tya8G",
-            "parameters" => %{
-              "entrypoint" => "offer",
-              "value" => %{
-                "prim" => "Pair",
-                "args" => [
-                  %{
-                    "prim" => "Pair",
-                    "args" => [
-                      %{
-                        "string" => "KT1L9L24QjU4qHmej6j1G5DTqhZanPxHH5ie"
-                      },
-                      %{
-                        "prim" => "Some",
-                        "args" => [
-                          %{
-                            "int" => "0"
-                          }
-                        ]
-                      }
-                    ]
-                  },
-                  %{
-                    "prim" => "Pair",
-                    "args" => [
-                      %{
-                        "prim" => "Right",
-                        "args" => [
-                          %{
-                            "prim" => "Right",
-                            "args" => [
-                              %{
-                                "prim" => "Unit"
-                              }
-                            ]
-                          }
-                        ]
-                      },
-                      %{
-                        "prim" => "Pair",
-                        "args" => [
-                          %{
-                            "int" => "1000000"
-                          },
-                          %{
-                            "prim" => "Pair",
-                            "args" => [
-                              [
-                                %{
-                                  "prim" => "Elt",
-                                  "args" => [
-                                    %{
-                                      "string" => @ghostnet_1_address
-                                    },
-                                    %{
-                                      "int" => "1000"
-                                    }
-                                  ]
-                                }
-                              ],
-                              %{
-                                "prim" => "Pair",
-                                "args" => [
-                                  %{
-                                    "prim" => "None"
-                                  },
-                                  %{
-                                    "prim" => "Pair",
-                                    "args" => [
-                                      [],
-                                      %{
-                                        "prim" => "Pair",
-                                        "args" => [
-                                          %{
-                                            "prim" => "None"
-                                          },
-                                          %{
-                                            "prim" => "None"
-                                          }
-                                        ]
-                                      }
-                                    ]
-                                  }
-                                ]
-                              }
-                            ]
-                          }
-                        ]
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        ]
-      }
-
-      operation_result = [
-        %{
-          "amount" => "1000000",
-          "counter" => "26949360",
-          "destination" => "KT1MFWsAXGUZ4gFkQnjByWjrrVtuQi4Tya8G",
-          "fee" => "0",
-          "gas_limit" => "1040000",
-          "kind" => "transaction",
-          "metadata" => %{
-            "operation_result" => %{
-              "consumed_milligas" => "2318760",
-              "paid_storage_size_diff" => "189",
-              "status" => "applied",
-              "storage_size" => "110701"
-            }
-          },
-          "parameters" => %{
-            "entrypoint" => "offer",
-            "value" => %{
-              "args" => [
-                %{
-                  "args" => [
-                    %{"string" => "KT1L9L24QjU4qHmej6j1G5DTqhZanPxHH5ie"},
-                    %{"args" => [%{"int" => "0"}], "prim" => "Some"}
-                  ],
-                  "prim" => "Pair"
-                },
-                %{
-                  "args" => [
-                    %{
-                      "args" => [
-                        %{"args" => [%{"prim" => "Unit"}], "prim" => "Right"}
-                      ],
-                      "prim" => "Right"
-                    },
-                    %{
-                      "args" => [
-                        %{"int" => "1000000"},
-                        %{
-                          "args" => [
-                            [
-                              %{
-                                "args" => [
-                                  %{
-                                    "string" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew"
-                                  },
-                                  %{"int" => "1000"}
-                                ],
-                                "prim" => "Elt"
-                              }
-                            ],
-                            %{
-                              "args" => [
-                                %{"prim" => "None"},
-                                %{
-                                  "args" => [
-                                    [],
-                                    %{
-                                      "args" => [
-                                        %{"prim" => "None"},
-                                        %{"prim" => "None"}
-                                      ],
-                                      "prim" => "Pair"
-                                    }
-                                  ],
-                                  "prim" => "Pair"
-                                }
-                              ],
-                              "prim" => "Pair"
-                            }
-                          ],
-                          "prim" => "Pair"
-                        }
-                      ],
-                      "prim" => "Pair"
-                    }
-                  ],
-                  "prim" => "Pair"
-                }
-              ],
-              "prim" => "Pair"
-            }
-          },
-          "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
-          "storage_limit" => "60000"
-        }
-      ]
+      operation_result = Tezex.OperationResultFixture.offer()
 
       assert %{
                "contents" => [
@@ -281,47 +92,20 @@ defmodule Tezex.RpcTest do
                    "gas_limit" => "2419",
                    "kind" => "transaction",
                    "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
-                   "storage_limit" => "189"
+                   "storage_limit" => "289"
                  }
                ]
              } =
-               Rpc.fill_operation_fee(operation, operation_result)
+               Rpc.fill_operation_fee(
+                 %{
+                   "contents" => []
+                 },
+                 operation_result
+               )
     end
 
     test "a transfer" do
-      operation = %{
-        "contents" => [
-          %{
-            "amount" => "100",
-            "counter" => "1",
-            "destination" => "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B",
-            "fee" => "0",
-            "gas_limit" => "0",
-            "kind" => "transaction",
-            "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
-            "storage_limit" => "0"
-          }
-        ]
-      }
-
-      operation_result = [
-        %{
-          "amount" => "100",
-          "counter" => "1",
-          "destination" => "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B",
-          "fee" => "0",
-          "gas_limit" => "1451",
-          "kind" => "transaction",
-          "metadata" => %{
-            "operation_result" => %{
-              "consumed_milligas" => "168721",
-              "status" => "applied"
-            }
-          },
-          "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
-          "storage_limit" => "257"
-        }
-      ]
+      operation_result = Tezex.OperationResultFixture.transfer()
 
       assert %{
                "contents" => [
@@ -329,11 +113,30 @@ defmodule Tezex.RpcTest do
                    "amount" => "100",
                    "fee" => "285",
                    "gas_limit" => "269",
-                   "storage_limit" => "0"
+                   "storage_limit" => "100"
                  }
                ]
              } =
-               Rpc.fill_operation_fee(operation, operation_result)
+               Rpc.fill_operation_fee(
+                 %{
+                   "contents" => []
+                 },
+                 operation_result
+               )
+    end
+
+    test "a settle_auction" do
+      operation_result = Tezex.OperationResultFixture.settle_auction()
+
+      assert %{
+               "contents" => [
+                 %{
+                   "fee" => "2372",
+                   "gas_limit" => "20847",
+                   "storage_limit" => "103"
+                 }
+               ]
+             } = Rpc.fill_operation_fee(%{"contents" => []}, operation_result)
     end
   end
 
@@ -343,106 +146,7 @@ defmodule Tezex.RpcTest do
     test "a contract operation" do
       rpc = %Rpc{endpoint: @endpoint}
 
-      contents = [
-        %{
-          "kind" => "transaction",
-          "amount" => "1000000",
-          "destination" => "KT1MFWsAXGUZ4gFkQnjByWjrrVtuQi4Tya8G",
-          "parameters" => %{
-            "entrypoint" => "offer",
-            "value" => %{
-              "prim" => "Pair",
-              "args" => [
-                %{
-                  "prim" => "Pair",
-                  "args" => [
-                    %{
-                      "string" => "KT1L9L24QjU4qHmej6j1G5DTqhZanPxHH5ie"
-                    },
-                    %{
-                      "prim" => "Some",
-                      "args" => [
-                        %{
-                          "int" => "0"
-                        }
-                      ]
-                    }
-                  ]
-                },
-                %{
-                  "prim" => "Pair",
-                  "args" => [
-                    %{
-                      "prim" => "Right",
-                      "args" => [
-                        %{
-                          "prim" => "Right",
-                          "args" => [
-                            %{
-                              "prim" => "Unit"
-                            }
-                          ]
-                        }
-                      ]
-                    },
-                    %{
-                      "prim" => "Pair",
-                      "args" => [
-                        %{
-                          "int" => "1000000"
-                        },
-                        %{
-                          "prim" => "Pair",
-                          "args" => [
-                            [
-                              %{
-                                "prim" => "Elt",
-                                "args" => [
-                                  %{
-                                    "string" => @ghostnet_1_address
-                                  },
-                                  %{
-                                    "int" => "1000"
-                                  }
-                                ]
-                              }
-                            ],
-                            %{
-                              "prim" => "Pair",
-                              "args" => [
-                                %{
-                                  "prim" => "None"
-                                },
-                                %{
-                                  "prim" => "Pair",
-                                  "args" => [
-                                    [],
-                                    %{
-                                      "prim" => "Pair",
-                                      "args" => [
-                                        %{
-                                          "prim" => "None"
-                                        },
-                                        %{
-                                          "prim" => "None"
-                                        }
-                                      ]
-                                    }
-                                  ]
-                                }
-                              ]
-                            }
-                          ]
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        }
-      ]
+      contents = Tezex.TransactionFixture.offer(@ghostnet_1_address)
 
       assert {:ok, operation_id} =
                Rpc.send_operation(rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)
@@ -453,11 +157,7 @@ defmodule Tezex.RpcTest do
     test "a transfer" do
       rpc = %Rpc{endpoint: @endpoint}
 
-      contents = %{
-        "amount" => "100",
-        "destination" => @ghostnet_2_address,
-        "kind" => "transaction"
-      }
+      contents = Tezex.TransactionFixture.offer(@ghostnet_2_address)
 
       assert {:ok, operation_id} =
                Rpc.send_operation(rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)

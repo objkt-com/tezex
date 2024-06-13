@@ -59,52 +59,62 @@ defmodule Tezex.Rpc do
   end
 
   @spec fill_operation_fee(operation(), list(preapplied_operations()),
-          storage_limit: non_neg_integer()
+          gas_limit: non_neg_integer(),
+          storage_limit: non_neg_integer(),
+          gas_reserve: non_neg_integer(),
+          burn_reserve: non_neg_integer()
         ) :: operation()
   def fill_operation_fee(operation, preapplied_operations, opts \\ []) do
+    gas_limit = Keyword.get(opts, :gas_limit)
     storage_limit = Keyword.get(opts, :storage_limit)
+    gas_reserve = Keyword.get(opts, :gas_reserve, Fee.default_gas_reserve())
+    burn_reserve = Keyword.get(opts, :burn_reserve, Fee.default_gas_reserve())
 
     number_contents = length(preapplied_operations)
 
     contents =
       Enum.map(preapplied_operations, fn content ->
         if validation_passes(content["kind"]) == 3 do
-          internal_consumed_milligas =
-            (get_in(content, ["metadata", "internal_operation_results"]) || [])
-            |> Enum.reduce(0, fn obj, sum ->
-              sum + String.to_integer(get_in(obj, ["result", "consumed_milligas"]) || "0")
-            end)
-
-          consumed_milligas =
-            internal_consumed_milligas +
-              case content["metadata"]["operation_result"]["consumed_milligas"] do
-                nil -> 0
-                v -> String.to_integer(v)
-              end
-
-          gas_limit_new = ceil(consumed_milligas / 1000)
-
           gas_limit_new =
-            if content["kind"] in ~w(origination transaction) do
-              gas_limit_new + Fee.default_gas_reserve()
+            if is_nil(gas_limit) do
+              get_preapplied_operation_values(content, fn x ->
+                v =
+                  Map.get(x, "consumed_milligas", "0")
+                  |> String.to_integer()
+
+                ceil(v / 1000)
+              end)
+              |> Enum.reduce(&(&1 + &2))
             else
-              gas_limit_new
+              div(gas_limit, number_contents)
             end
 
           storage_limit_new =
             if is_nil(storage_limit) do
               paid_storage_size_diff =
-                case content["metadata"]["operation_result"]["paid_storage_size_diff"] do
-                  nil -> 0
-                  v -> String.to_integer(v)
-                end
+                get_preapplied_operation_values(
+                  content,
+                  fn x ->
+                    Map.get(x, "paid_storage_size_diff", "0")
+                    |> String.to_integer()
+                  end
+                )
+                |> Enum.reduce(&(&1 + &2))
 
               burned =
-                case content["metadata"]["operation_result"]["allocated_destination_contract"] ||
-                       content["metadata"]["operation_result"]["originated_contracts"] do
-                  nil -> 0
-                  _ -> 257
-                end
+                get_preapplied_operation_values(content, fn x ->
+                  allocated_destination_contract? =
+                    not is_nil(Map.get(x, "allocated_destination_contract"))
+
+                  originated_contracts? = not is_nil(Map.get(x, "originated_contracts"))
+
+                  if allocated_destination_contract? or originated_contracts? do
+                    257
+                  else
+                    0
+                  end
+                end)
+                |> Enum.reduce(&(&1 + &2))
 
               paid_storage_size_diff + burned
             else
@@ -112,6 +122,13 @@ defmodule Tezex.Rpc do
             end
 
           content = Map.drop(content, ~w(metadata))
+
+          {gas_limit_new, storage_limit_new} =
+            if content["kind"] in ~w(origination transaction) do
+              {gas_limit_new + gas_reserve, storage_limit_new + burn_reserve}
+            else
+              gas_limit_new
+            end
 
           extra_size = 1 + div(Fee.extra_size(), number_contents)
           fee = Fee.calculate_fee(content, gas_limit_new, extra_size: extra_size)
@@ -128,6 +145,19 @@ defmodule Tezex.Rpc do
       end)
 
     %{operation | "contents" => contents}
+  end
+
+  defp get_preapplied_operation_values(op, value_fun) do
+    metadata = Map.get(op, "metadata", %{})
+    internal_operation_results = Map.get(metadata, "internal_operation_results", [])
+    operation_result = Map.get(metadata, "operation_result")
+
+    internal_operation_values =
+      Enum.map(internal_operation_results, fn r ->
+        value_fun.(r["result"])
+      end)
+
+    [value_fun.(operation_result) | internal_operation_values]
   end
 
   @doc """
