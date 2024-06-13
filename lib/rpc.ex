@@ -64,17 +64,6 @@ defmodule Tezex.Rpc do
   def fill_operation_fee(operation, preapplied_operations, opts \\ []) do
     storage_limit = Keyword.get(opts, :storage_limit)
 
-    applied? =
-      Enum.all?(
-        preapplied_operations,
-        &(&1["metadata"]["operation_result"]["status"] == "applied")
-      )
-
-    unless applied? do
-      errors = Enum.map(preapplied_operations, & &1["metadata"]["operation_result"]["errors"])
-      raise inspect(errors)
-    end
-
     number_contents = length(preapplied_operations)
 
     contents =
@@ -165,13 +154,17 @@ defmodule Tezex.Rpc do
     counter = get_next_counter_for_account(rpc, wallet_address)
     operation = prepare_operation(transactions, wallet_address, counter, branch)
 
-    {:ok, [%{"contents" => preapplied_operations}]} =
-      preapply_operation(rpc, operation, encoded_private_key, protocol)
+    case preapply_operation(rpc, operation, encoded_private_key, protocol) do
+      {:ok, preapplied_operations} ->
+        operation = fill_operation_fee(operation, preapplied_operations, opts)
 
-    operation = fill_operation_fee(operation, preapplied_operations, opts)
-    payload = forge_and_sign_operation(operation, encoded_private_key)
+        payload = forge_and_sign_operation(operation, encoded_private_key)
 
-    inject_operation(rpc, payload)
+        inject_operation(rpc, payload)
+
+      err ->
+        err
+    end
   end
 
   @doc """
@@ -195,12 +188,58 @@ defmodule Tezex.Rpc do
   Simulate the application of the operations with the context of the given block and return the result of each operation application.
   """
   @spec preapply_operation(t(), map(), encoded_private_key(), any()) ::
-          {:ok, any()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
+          {:ok, any()}
+          | {:error, Finch.Error.t()}
+          | {:error, Jason.DecodeError.t()}
+          | {:error, term()}
   def preapply_operation(%Rpc{} = rpc, operation, encoded_private_key, protocol) do
     forged_operation = ForgeOperation.operation_group(operation)
     signature = Crypto.sign_operation(encoded_private_key, forged_operation)
     payload = [Map.merge(operation, %{"signature" => signature, "protocol" => protocol})]
-    post(rpc, "/blocks/head/helpers/preapply/operations", payload)
+
+    case post(rpc, "/blocks/head/helpers/preapply/operations", payload) do
+      {:ok, [%{"contents" => preapplied_operations}]} ->
+        applied? =
+          Enum.all?(
+            preapplied_operations,
+            &(&1["metadata"]["operation_result"]["status"] == "applied")
+          )
+
+        if applied? do
+          {:ok, preapplied_operations}
+        else
+          errors =
+            Enum.flat_map(
+              preapplied_operations,
+              fn
+                %{
+                  "metadata" => %{
+                    "internal_operation_results" => internal_operation_results
+                  }
+                } ->
+                  Enum.flat_map(internal_operation_results, & &1["result"]["errors"])
+
+                _ ->
+                  []
+              end
+            )
+
+          errors =
+            if Enum.empty?(errors) do
+              Enum.map(preapplied_operations, & &1["metadata"]["operation_result"]["errors"])
+            else
+              errors
+            end
+
+          {:error, errors}
+        end
+
+      {:ok, result} ->
+        {:error, result}
+
+      err ->
+        err
+    end
   end
 
   @spec get_counter_for_account(t(), nonempty_binary()) ::

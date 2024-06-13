@@ -467,7 +467,7 @@ defmodule Tezex.RpcTest do
   end
 
   @tag :tezos
-  test "raise" do
+  test "return preapply errors" do
     rpc = %Rpc{endpoint: @endpoint}
 
     contents = [
@@ -478,8 +478,23 @@ defmodule Tezex.RpcTest do
       }
     ]
 
-    assert_raise RuntimeError, fn ->
-      Rpc.send_operation(rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)
-    end
+    assert {:error,
+            [
+              [
+                %{
+                  "amount" => "1000000000",
+                  "balance" => "896799001",
+                  "contract" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
+                  "id" => "proto.019-PtParisB.contract.balance_too_low",
+                  "kind" => "temporary"
+                },
+                %{
+                  "amounts" => ["896799001", "1000000000"],
+                  "id" => "proto.019-PtParisB.tez.subtraction_underflow",
+                  "kind" => "temporary"
+                }
+              ]
+            ]} =
+             Rpc.send_operation(rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)
   end
 end
