@@ -7,7 +7,10 @@
 - [crypto] add a pure Elixir [HMAC-DRBG](https://hexdocs.pm/tezex/Tezex.Crypto.HMACDRBG.html) implementation
 - [crypto] implement message/operations [signing](https://hexdocs.pm/tezex/Tezex.Crypto.html#sign_message/2)
 - [crypto] implement [validate_address/1](https://hexdocs.pm/tezex/Tezex.Crypto.html#validate_address/1) to validate implicit account addresses
-- implement (un)forging [micheline](https://hexdocs.pm/tezex/Tezex.Forge.html), [operations/operation groups](https://hexdocs.pm/tezex/Tezex.ForgeOperation.html), [calculating gas/storage/fees](https://hexdocs.pm/tezex/Tezex.Fee.html) and [sending them to Tezos RPC nodes](https://hexdocs.pm/tezex/Tezex.Rpc.html).
+- implement: 
+  - (un)forging [micheline](https://hexdocs.pm/tezex/Tezex.Forge.html), [operations/operation groups](https://hexdocs.pm/tezex/Tezex.ForgeOperation.html)
+  - [calculating gas/storage/fees](https://hexdocs.pm/tezex/Tezex.Fee.html)
+  - [sending transactions to Tezos RPC nodes](https://hexdocs.pm/tezex/Tezex.Rpc.html)
 
 ## v1.2.0
 
