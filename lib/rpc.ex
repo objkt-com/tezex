@@ -202,7 +202,7 @@ defmodule Tezex.Rpc do
   """
   @spec forge_and_sign_operation(operation(), encoded_private_key()) :: nonempty_binary()
   def forge_and_sign_operation(operation, encoded_private_key) do
-    forged_operation = ForgeOperation.operation_group(operation)
+    {:ok, forged_operation} = ForgeOperation.operation_group(operation)
 
     signature = Crypto.sign_operation(encoded_private_key, forged_operation)
 
@@ -223,7 +223,7 @@ defmodule Tezex.Rpc do
           | {:error, Jason.DecodeError.t()}
           | {:error, term()}
   def preapply_operation(%Rpc{} = rpc, operation, encoded_private_key, protocol) do
-    forged_operation = ForgeOperation.operation_group(operation)
+    {:ok, forged_operation} = ForgeOperation.operation_group(operation)
     signature = Crypto.sign_operation(encoded_private_key, forged_operation)
     payload = [Map.merge(operation, %{"signature" => signature, "protocol" => protocol})]
 

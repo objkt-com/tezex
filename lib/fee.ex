@@ -31,7 +31,8 @@ defmodule Tezex.Fee do
     minimal_nanotez_per_gas_unit =
       Keyword.get(opts, :minimal_nanotez_per_gas_unit, @minimal_nanotez_per_gas_unit)
 
-    size = byte_size(ForgeOperation.operation(content)) + extra_size
+    {:ok, forged_content} = ForgeOperation.operation(content)
+    size = byte_size(forged_content) + extra_size
 
     fee =
       @minimal_fees + @minimal_mutez_per_byte * size +
