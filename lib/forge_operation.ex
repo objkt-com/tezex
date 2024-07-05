@@ -57,7 +57,7 @@ defmodule Tezex.ForgeOperation do
     <<tag::size(8)>>
   end
 
-  @spec operation(map()) :: nonempty_binary()
+  @spec operation(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
   def operation(content) do
     case content["kind"] do
       "failing_noop" -> failing_noop(content)
@@ -75,205 +75,410 @@ defmodule Tezex.ForgeOperation do
     end
   end
 
-  @spec operation_group(map()) :: nonempty_binary()
+  @spec operation_group(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
   def operation_group(operation_group) do
-    [
-      Forge.forge_base58(operation_group["branch"]),
-      Enum.join(Enum.map(operation_group["contents"], &operation/1))
-    ]
-    |> IO.iodata_to_binary()
-    |> Base.encode16(case: :lower)
+    case validate_required_keys(operation_group, ~w(branch contents)) do
+      :ok ->
+        operations =
+          Enum.map(operation_group["contents"], &operation/1)
+          |> Enum.map(fn {:ok, operation} -> operation end)
+
+        content =
+          [
+            Forge.forge_base58(operation_group["branch"]),
+            Enum.join(operations)
+          ]
+          |> IO.iodata_to_binary()
+          |> Base.encode16(case: :lower)
+
+        {:ok, content}
+
+      err ->
+        err
+    end
   end
 
-  @spec activate_account(map()) :: nonempty_binary()
+  @spec activate_account(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
   def activate_account(content) do
-    [
-      forge_tag(@operation_tags[content["kind"]]),
-      binary_slice(Forge.forge_address(content["pkh"]), 2..-1//1),
-      Base.decode16!(content["secret"], case: :mixed)
-    ]
-    |> IO.iodata_to_binary()
+    case validate_required_keys(content, ~w(kind pkh secret)) do
+      :ok ->
+        content =
+          [
+            forge_tag(@operation_tags[content["kind"]]),
+            binary_slice(Forge.forge_address(content["pkh"]), 2..-1//1),
+            Base.decode16!(content["secret"], case: :mixed)
+          ]
+          |> IO.iodata_to_binary()
+
+        {:ok, content}
+
+      err ->
+        err
+    end
   end
 
-  @spec reveal(map()) :: nonempty_binary()
+  @spec reveal(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
   def reveal(content) do
-    [
-      forge_tag(@operation_tags[content["kind"]]),
-      Forge.forge_address(content["source"], :bytes, true),
-      Forge.forge_nat(String.to_integer(content["fee"])),
-      Forge.forge_nat(String.to_integer(content["counter"])),
-      Forge.forge_nat(String.to_integer(content["gas_limit"])),
-      Forge.forge_nat(String.to_integer(content["storage_limit"])),
-      Forge.forge_public_key(content["public_key"])
-    ]
-    |> IO.iodata_to_binary()
+    case validate_required_keys(
+           content,
+           ~w(kind source fee counter gas_limit storage_limit public_key)
+         ) do
+      :ok ->
+        content =
+          [
+            forge_tag(@operation_tags[content["kind"]]),
+            Forge.forge_address(content["source"], :bytes, true),
+            Forge.forge_nat(String.to_integer(content["fee"])),
+            Forge.forge_nat(String.to_integer(content["counter"])),
+            Forge.forge_nat(String.to_integer(content["gas_limit"])),
+            Forge.forge_nat(String.to_integer(content["storage_limit"])),
+            Forge.forge_public_key(content["public_key"])
+          ]
+          |> IO.iodata_to_binary()
+
+        {:ok, content}
+
+      err ->
+        err
+    end
   end
 
-  @spec transaction(map()) :: nonempty_binary()
+  @spec transaction(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
   def transaction(content) do
-    [
-      forge_tag(@operation_tags[content["kind"]]),
-      Forge.forge_address(content["source"], :bytes, true),
-      Forge.forge_nat(String.to_integer(content["fee"])),
-      Forge.forge_nat(String.to_integer(content["counter"])),
-      Forge.forge_nat(String.to_integer(content["gas_limit"])),
-      Forge.forge_nat(String.to_integer(content["storage_limit"])),
-      Forge.forge_nat(String.to_integer(content["amount"])),
-      Forge.forge_address(content["destination"]),
-      if has_parameters(content) do
-        params = content["parameters"]
+    case validate_required_keys(
+           content,
+           ~w(kind source fee counter gas_limit storage_limit amount destination)
+         ) do
+      :ok ->
+        content =
+          [
+            forge_tag(@operation_tags[content["kind"]]),
+            Forge.forge_address(content["source"], :bytes, true),
+            Forge.forge_nat(String.to_integer(content["fee"])),
+            Forge.forge_nat(String.to_integer(content["counter"])),
+            Forge.forge_nat(String.to_integer(content["gas_limit"])),
+            Forge.forge_nat(String.to_integer(content["storage_limit"])),
+            Forge.forge_nat(String.to_integer(content["amount"])),
+            Forge.forge_address(content["destination"]),
+            if has_parameters(content) do
+              :ok =
+                validate_required_keys(
+                  content,
+                  ~w(parameters parameters.entrypoint parameters.value)
+                )
 
-        [
-          Forge.forge_bool(true),
-          entrypoint(params["entrypoint"]),
-          Forge.forge_array(Forge.forge_micheline(params["value"]))
-        ]
-      else
-        Forge.forge_bool(false)
-      end
-    ]
-    |> IO.iodata_to_binary()
+              params = content["parameters"]
+
+              [
+                Forge.forge_bool(true),
+                entrypoint(params["entrypoint"]),
+                Forge.forge_array(Forge.forge_micheline(params["value"]))
+              ]
+            else
+              Forge.forge_bool(false)
+            end
+          ]
+          |> IO.iodata_to_binary()
+
+        {:ok, content}
+
+      err ->
+        err
+    end
   end
 
-  @spec origination(map()) :: nonempty_binary()
+  @spec origination(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
   def origination(content) do
-    [
-      forge_tag(@operation_tags[content["kind"]]),
-      Forge.forge_address(content["source"], :bytes, true),
-      Forge.forge_nat(String.to_integer(content["fee"])),
-      Forge.forge_nat(String.to_integer(content["counter"])),
-      Forge.forge_nat(String.to_integer(content["gas_limit"])),
-      Forge.forge_nat(String.to_integer(content["storage_limit"])),
-      Forge.forge_nat(String.to_integer(content["balance"])),
-      case Map.get(content, "delegate") do
-        nil ->
-          Forge.forge_bool(false)
+    case validate_required_keys(
+           content,
+           ~w(kind source fee counter gas_limit storage_limit balance)
+         ) do
+      :ok ->
+        content =
+          [
+            forge_tag(@operation_tags[content["kind"]]),
+            Forge.forge_address(content["source"], :bytes, true),
+            Forge.forge_nat(String.to_integer(content["fee"])),
+            Forge.forge_nat(String.to_integer(content["counter"])),
+            Forge.forge_nat(String.to_integer(content["gas_limit"])),
+            Forge.forge_nat(String.to_integer(content["storage_limit"])),
+            Forge.forge_nat(String.to_integer(content["balance"])),
+            case Map.get(content, "delegate") do
+              nil ->
+                Forge.forge_bool(false)
 
-        delegate ->
-          [Forge.forge_bool(true), Forge.forge_address(delegate, :bytes, true)]
-      end,
-      Forge.forge_script(content["script"])
-    ]
-    |> IO.iodata_to_binary()
+              delegate ->
+                [Forge.forge_bool(true), Forge.forge_address(delegate, :bytes, true)]
+            end,
+            Forge.forge_script(content["script"])
+          ]
+          |> IO.iodata_to_binary()
+
+        {:ok, content}
+
+      err ->
+        err
+    end
   end
 
-  @spec delegation(map()) :: nonempty_binary()
+  @spec delegation(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
   def delegation(content) do
-    [
-      forge_tag(@operation_tags[content["kind"]]),
-      Forge.forge_address(content["source"], :bytes, true),
-      Forge.forge_nat(String.to_integer(content["fee"])),
-      Forge.forge_nat(String.to_integer(content["counter"])),
-      Forge.forge_nat(String.to_integer(content["gas_limit"])),
-      Forge.forge_nat(String.to_integer(content["storage_limit"])),
-      case Map.get(content, "delegate") do
-        nil ->
-          Forge.forge_bool(false)
+    case validate_required_keys(
+           content,
+           ~w(kind source fee counter gas_limit storage_limit)
+         ) do
+      :ok ->
+        content =
+          [
+            forge_tag(@operation_tags[content["kind"]]),
+            Forge.forge_address(content["source"], :bytes, true),
+            Forge.forge_nat(String.to_integer(content["fee"])),
+            Forge.forge_nat(String.to_integer(content["counter"])),
+            Forge.forge_nat(String.to_integer(content["gas_limit"])),
+            Forge.forge_nat(String.to_integer(content["storage_limit"])),
+            case Map.get(content, "delegate") do
+              nil ->
+                Forge.forge_bool(false)
 
-        delegate ->
-          [Forge.forge_bool(true), Forge.forge_address(delegate, :bytes, true)]
-      end
-    ]
-    |> IO.iodata_to_binary()
+              delegate ->
+                [Forge.forge_bool(true), Forge.forge_address(delegate, :bytes, true)]
+            end
+          ]
+          |> IO.iodata_to_binary()
+
+        {:ok, content}
+
+      err ->
+        err
+    end
   end
 
-  @spec endorsement(map()) :: nonempty_binary()
+  @spec endorsement(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
   def endorsement(content) do
-    [forge_tag(content["kind"]), Forge.forge_int32(String.to_integer(content["level"]))]
-    |> IO.iodata_to_binary()
+    case validate_required_keys(content, ~w(kind level)) do
+      :ok ->
+        content =
+          [forge_tag(content["kind"]), Forge.forge_int32(String.to_integer(content["level"]))]
+          |> IO.iodata_to_binary()
+
+        {:ok, content}
+
+      err ->
+        err
+    end
   end
 
-  @spec inline_endorsement(map()) :: nonempty_binary()
+  @spec inline_endorsement(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
   def inline_endorsement(content) do
-    [
-      Forge.forge_base58(content["branch"]),
-      Forge.forge_nat(@operation_tags[content["operations"]["kind"]]),
-      Forge.forge_int32(String.to_integer(content["operations"]["level"])),
-      Forge.forge_base58(content["signature"])
-    ]
-    |> IO.iodata_to_binary()
+    case validate_required_keys(
+           content,
+           ~w(branch operations operations.kind operations.level signature)
+         ) do
+      :ok ->
+        content =
+          [
+            Forge.forge_base58(content["branch"]),
+            Forge.forge_nat(@operation_tags[content["operations"]["kind"]]),
+            Forge.forge_int32(String.to_integer(content["operations"]["level"])),
+            Forge.forge_base58(content["signature"])
+          ]
+          |> IO.iodata_to_binary()
+
+        {:ok, content}
+
+      err ->
+        err
+    end
   end
 
-  @spec endorsement_with_slot(map()) :: nonempty_binary()
+  @spec endorsement_with_slot(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
   def endorsement_with_slot(content) do
-    [
-      forge_tag(content["kind"]),
-      Forge.forge_array(inline_endorsement(content["endorsement"])),
-      Forge.forge_int16(String.to_integer(content["slot"]))
-    ]
-    |> IO.iodata_to_binary()
+    case validate_required_keys(content, ~w(kind endorsement slot)) do
+      :ok ->
+        {:ok, endorsement} = inline_endorsement(content["endorsement"])
+
+        content =
+          [
+            forge_tag(content["kind"]),
+            Forge.forge_array(endorsement),
+            Forge.forge_int16(String.to_integer(content["slot"]))
+          ]
+          |> IO.iodata_to_binary()
+
+        {:ok, content}
+
+      err ->
+        err
+    end
   end
 
-  @spec failing_noop(map()) :: nonempty_binary()
+  @spec failing_noop(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
   def failing_noop(content) do
-    [forge_tag(content["kind"]), Forge.forge_array(content["arbitrary"])] |> IO.iodata_to_binary()
+    case validate_required_keys(content, ~w(kind arbitrary)) do
+      :ok ->
+        content =
+          [forge_tag(content["kind"]), Forge.forge_array(content["arbitrary"])]
+          |> IO.iodata_to_binary()
+
+        {:ok, content}
+
+      err ->
+        err
+    end
   end
 
-  @spec register_global_constant(map()) :: nonempty_binary()
+  @spec register_global_constant(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
   def register_global_constant(content) do
-    [
-      forge_tag(@operation_tags[content["kind"]]),
-      Forge.forge_address(content["source"], :bytes, true),
-      Forge.forge_nat(String.to_integer(content["fee"])),
-      Forge.forge_nat(String.to_integer(content["counter"])),
-      Forge.forge_nat(String.to_integer(content["gas_limit"])),
-      Forge.forge_nat(String.to_integer(content["storage_limit"])),
-      Forge.forge_array(Forge.forge_micheline(content["value"]))
-    ]
-    |> IO.iodata_to_binary()
+    case validate_required_keys(
+           content,
+           ~w(kind source fee counter gas_limit storage_limit value)
+         ) do
+      :ok ->
+        content =
+          [
+            forge_tag(@operation_tags[content["kind"]]),
+            Forge.forge_address(content["source"], :bytes, true),
+            Forge.forge_nat(String.to_integer(content["fee"])),
+            Forge.forge_nat(String.to_integer(content["counter"])),
+            Forge.forge_nat(String.to_integer(content["gas_limit"])),
+            Forge.forge_nat(String.to_integer(content["storage_limit"])),
+            Forge.forge_array(Forge.forge_micheline(content["value"]))
+          ]
+          |> IO.iodata_to_binary()
+
+        {:ok, content}
+
+      err ->
+        err
+    end
   end
 
-  @spec transfer_ticket(map()) :: nonempty_binary()
+  @spec transfer_ticket(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
   def transfer_ticket(content) do
-    [
-      forge_tag(@operation_tags[content["kind"]]),
-      Forge.forge_address(content["source"], :bytes, true),
-      Forge.forge_nat(String.to_integer(content["fee"])),
-      Forge.forge_nat(String.to_integer(content["counter"])),
-      Forge.forge_nat(String.to_integer(content["gas_limit"])),
-      Forge.forge_nat(String.to_integer(content["storage_limit"])),
-      Forge.forge_array(Forge.forge_micheline(content["ticket_contents"])),
-      Forge.forge_array(Forge.forge_micheline(content["ticket_ty"])),
-      Forge.forge_address(content["ticket_ticketer"]),
-      Forge.forge_nat(String.to_integer(content["ticket_amount"])),
-      Forge.forge_address(content["destination"]),
-      Forge.forge_array(content["entrypoint"])
-    ]
-    |> IO.iodata_to_binary()
+    case validate_required_keys(
+           content,
+           ~w(kind source fee counter gas_limit storage_limit ticket_contents ticket_ty ticket_ticketer ticket_amount destination entrypoint)
+         ) do
+      :ok ->
+        content =
+          [
+            forge_tag(@operation_tags[content["kind"]]),
+            Forge.forge_address(content["source"], :bytes, true),
+            Forge.forge_nat(String.to_integer(content["fee"])),
+            Forge.forge_nat(String.to_integer(content["counter"])),
+            Forge.forge_nat(String.to_integer(content["gas_limit"])),
+            Forge.forge_nat(String.to_integer(content["storage_limit"])),
+            Forge.forge_array(Forge.forge_micheline(content["ticket_contents"])),
+            Forge.forge_array(Forge.forge_micheline(content["ticket_ty"])),
+            Forge.forge_address(content["ticket_ticketer"]),
+            Forge.forge_nat(String.to_integer(content["ticket_amount"])),
+            Forge.forge_address(content["destination"]),
+            Forge.forge_array(content["entrypoint"])
+          ]
+          |> IO.iodata_to_binary()
+
+        {:ok, content}
+
+      err ->
+        err
+    end
   end
 
-  @spec smart_rollup_add_messages(map()) :: nonempty_binary()
+  @spec smart_rollup_add_messages(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
   def smart_rollup_add_messages(content) do
-    [
-      forge_tag(@operation_tags[content["kind"]]),
-      Forge.forge_address(content["source"], :bytes, true),
-      Forge.forge_nat(String.to_integer(content["fee"])),
-      Forge.forge_nat(String.to_integer(content["counter"])),
-      Forge.forge_nat(String.to_integer(content["gas_limit"])),
-      Forge.forge_nat(String.to_integer(content["storage_limit"])),
-      Forge.forge_array(
-        Enum.join(
-          Enum.map(content["message"], &Forge.forge_array(:binary.decode_hex(&1))),
-          ""
-        )
-      )
-    ]
-    |> IO.iodata_to_binary()
+    case validate_required_keys(
+           content,
+           ~w(kind source fee counter gas_limit storage_limit message)
+         ) do
+      :ok ->
+        content =
+          [
+            forge_tag(@operation_tags[content["kind"]]),
+            Forge.forge_address(content["source"], :bytes, true),
+            Forge.forge_nat(String.to_integer(content["fee"])),
+            Forge.forge_nat(String.to_integer(content["counter"])),
+            Forge.forge_nat(String.to_integer(content["gas_limit"])),
+            Forge.forge_nat(String.to_integer(content["storage_limit"])),
+            Forge.forge_array(
+              Enum.join(
+                Enum.map(content["message"], &Forge.forge_array(:binary.decode_hex(&1))),
+                ""
+              )
+            )
+          ]
+          |> IO.iodata_to_binary()
+
+        {:ok, content}
+
+      err ->
+        err
+    end
   end
 
-  @spec smart_rollup_execute_outbox_message(map()) :: nonempty_binary()
+  @spec smart_rollup_execute_outbox_message(map()) ::
+          {:ok, nonempty_binary()} | {:error, nonempty_binary()}
   def smart_rollup_execute_outbox_message(content) do
-    [
-      forge_tag(@operation_tags[content["kind"]]),
-      Forge.forge_address(content["source"], :bytes, true),
-      Forge.forge_nat(String.to_integer(content["fee"])),
-      Forge.forge_nat(String.to_integer(content["counter"])),
-      Forge.forge_nat(String.to_integer(content["gas_limit"])),
-      Forge.forge_nat(String.to_integer(content["storage_limit"])),
-      Forge.forge_base58(content["rollup"]),
-      Forge.forge_base58(content["cemented_commitment"]),
-      Forge.forge_array(:binary.decode_hex(content["output_proof"]))
-    ]
-    |> IO.iodata_to_binary()
+    case validate_required_keys(
+           content,
+           ~w(kind source fee counter gas_limit storage_limit rollup cemented_commitment output_proof)
+         ) do
+      :ok ->
+        content =
+          [
+            forge_tag(@operation_tags[content["kind"]]),
+            Forge.forge_address(content["source"], :bytes, true),
+            Forge.forge_nat(String.to_integer(content["fee"])),
+            Forge.forge_nat(String.to_integer(content["counter"])),
+            Forge.forge_nat(String.to_integer(content["gas_limit"])),
+            Forge.forge_nat(String.to_integer(content["storage_limit"])),
+            Forge.forge_base58(content["rollup"]),
+            Forge.forge_base58(content["cemented_commitment"]),
+            Forge.forge_array(:binary.decode_hex(content["output_proof"]))
+          ]
+          |> IO.iodata_to_binary()
+
+        {:ok, content}
+
+      err ->
+        err
+    end
+  end
+
+  @spec validate_required_keys(map(), list()) :: :ok | {:error, nonempty_binary()}
+  def validate_required_keys(map, required_keys, acc \\ "")
+      when is_map(map) and is_list(required_keys) do
+    required_keys = Enum.group_by(required_keys, &String.contains?(&1, "."))
+
+    root = Map.get(required_keys, false, [])
+    missing_keys = root -- Map.keys(map)
+
+    if Enum.empty?(missing_keys) do
+      next = Map.get(required_keys, true, [])
+
+      if Enum.empty?(next) do
+        :ok
+      else
+        Enum.group_by(
+          next,
+          fn v ->
+            [a, _] = String.split(v, ".", parts: 2)
+            a
+          end,
+          fn v ->
+            [_, b] = String.split(v, ".", parts: 2)
+            b
+          end
+        )
+        |> Enum.reduce_while(:ok, fn {key, keys}, _ ->
+          case validate_required_keys(map[key], keys, "#{acc}#{key}.") do
+            :ok -> {:cont, :ok}
+            err -> {:halt, err}
+          end
+        end)
+      end
+    else
+      {:error,
+       "Operation content is missing required keys: #{acc}#{Enum.join(missing_keys, ", ")}"}
+    end
   end
 end
