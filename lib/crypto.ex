@@ -1,6 +1,13 @@
 defmodule Tezex.Crypto do
   @moduledoc """
-  A set of functions to check Tezos signed messages, derive a pkh from a pubkey, verify that a public key corresponds to a wallet address (public key hash).
+  Provides cryptographic functions for Tezos blockchain operations.
+
+  This module includes functions to:
+  - Check Tezos signed messages
+  - Derive public key hashes (pkh) from public keys
+  - Verify that a public key corresponds to a wallet address (public key hash)
+  - Sign messages and operations
+  - Encode and decode various Tezos-specific data formats
   """
 
   alias Tezex.Crypto.Base58Check
@@ -29,7 +36,20 @@ defmodule Tezex.Crypto do
   @prefix_p2sig <<54, 240, 44, 52>>
   @prefix_sig <<4, 130, 43>>
 
+  @typedoc """
+  Represents a private key parameter.
+  It can be either a binary string (the private key itself) or a tuple containing the private key and a passphrase.
+  """
   @type privkey_param :: binary() | {privkey :: binary(), passphrase :: binary()}
+
+  @typedoc """
+  Represents the result of a signature verification operation.
+  It can be either `:ok` if the signature is valid, or an error tuple with a specific reason.
+  """
+  @type signature_verification_result ::
+          :ok
+          | {:error,
+             :address_mismatch | :invalid_pubkey_format | :invalid_signature | :bad_signature}
 
   @doc """
   Verify that `address` is the public key hash of `pubkey` and that `signature` is a valid signature for `message` signed with the private key corresponding to public key `pubkey`.

@@ -11,7 +11,21 @@ defmodule Tezex.Forge do
   alias Tezex.Crypto.Base58Check
   alias Tezex.Zarith
 
+  @typedoc """
+  Represents the encoding type for input/output operations.
+  Can be either `:bytes` for raw binary data or `:hex` for hexadecimal string representation.
+  """
   @type io_encoding :: :bytes | :hex
+
+  @typedoc """
+  Represents a base58 encoding configuration.
+  """
+  @type base58_encoding :: %{
+          e_prefix: String.t(),
+          e_len: non_neg_integer(),
+          d_prefix: binary(),
+          d_len: non_neg_integer()
+        }
 
   @base58_encodings [
     # block hash
@@ -124,10 +138,27 @@ defmodule Tezex.Forge do
   end
 
   @doc """
-  Encode a signed unbounded integer into byte form.
+  Encodes a signed unbounded integer into byte form.
+
+  ## Parameters
+
+    * `value` - The integer to be encoded.
+    * `output_encoding` - The encoding type for the output. Defaults to `:bytes`.
+
+  ## Returns
+
+    A binary string representing the encoded integer.
+
+  ## Examples
+
+      iex> forge_int(123)
+      <<123>>
+
+      iex> forge_int(123, :hex)
+      "7B"
+
   """
   @spec forge_int(integer(), io_encoding()) :: nonempty_binary()
-  @spec forge_int(integer()) :: nonempty_binary()
   def forge_int(value, output_encoding \\ :bytes) when is_integer(value) do
     bin = Zarith.encode(value)
 

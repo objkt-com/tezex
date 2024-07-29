@@ -1,45 +1,79 @@
 defmodule Tezex.Zarith do
   @moduledoc """
+  Provides encoding and decoding functions for Zarith numbers.
+
   A Zarith number is an integer encoded as a variable length sequence of bytes.
 
   Each byte has a running unary size bit:
-    - the most significant bit of each byte tells if this is the last byte in the sequence (0) or if there is more to read (1)
-    - the second most significant bit of the first byte is reserved for the sign (positive if zero).
+    - The most significant bit of each byte tells if this is the last byte in the sequence (0) or if there is more to read (1)
+    - The second most significant bit of the first byte is reserved for the sign (positive if zero)
 
   Size and sign bits ignored, data is then the binary representation of the absolute value of the number in little endian order.
   """
 
+  @typedoc """
+  Represents a Zarith-encoded integer as a hexadecimal string.
+  """
+  @type zarith_hex :: String.t()
+
+  @typedoc """
+  Represents a decoded Zarith number as an Elixir integer.
+  """
+  @type decoded_zarith :: integer()
+
   @doc """
-  Decodes a zarith-encoded integer.
-  Takes a binary and returns the integer in base 10.
+  Decodes a Zarith-encoded integer.
+
+  Takes a hexadecimal string representation of a Zarith-encoded number and returns the integer in base 10.
+
+  ## Parameters
+
+    * `binary_input` - A hexadecimal string representing the Zarith-encoded integer.
+
+  ## Returns
+
+    The decoded integer.
 
   ## Examples
-      iex> decode("a1d22c")
+
+      iex> Tezex.Zarith.decode("a1d22c")
       365_729
 
-      iex> decode("e1d22c")
+      iex> Tezex.Zarith.decode("e1d22c")
       -365_729
+
   """
-  @spec decode(nonempty_binary()) :: integer()
+  @spec decode(zarith_hex()) :: decoded_zarith()
   def decode(binary_input) when is_binary(binary_input) do
     {%{int: integer}, _} = consume(binary_input)
     String.to_integer(integer)
   end
 
   @doc """
-  Encodes an integer to a zarith-encoded binary.
-  Takes an integer in base 10 and returns the encoded binary.
+  Encodes an integer to a Zarith-encoded hexadecimal string.
+
+  Takes an integer in base 10 and returns the Zarith-encoded hexadecimal string.
 
   Implementation based on [anchorageoss/tezosprotocol (MIT License - Copyright (c) 2019 Anchor Labs, Inc.)](https://github.com/anchorageoss/tezosprotocol/blob/23a051d34fcfda8393940141f8151113a1aca10b/zarith/zarith.go#L153)
 
+  ## Parameters
+
+    * `integer` - The integer to be encoded.
+
+  ## Returns
+
+    A hexadecimal string representing the Zarith-encoded integer.
+
   ## Examples
-      iex> encode(365_729)
+
+      iex> Tezex.Zarith.encode(365_729)
       "a1d22c"
 
-      iex> encode(-365_729)
+      iex> Tezex.Zarith.encode(-365_729)
       "e1d22c"
+
   """
-  @spec encode(integer()) :: nonempty_binary()
+  @spec encode(decoded_zarith()) :: zarith_hex()
   def encode(integer) when is_integer(integer) do
     sign = if integer < 0, do: 1, else: 0
 
@@ -104,11 +138,31 @@ defmodule Tezex.Zarith do
   end
 
   @doc """
-  Consumes a zarith-encoded integer.
-  Takes a binary and returns the decoded integer in base 10 along with how many characters of the input binary
+  Consumes a Zarith-encoded integer.
+
+  Takes a hexadecimal string and returns the decoded integer in base 10 along with how many characters of the input string
   were used to decode the integer.
+
+  ## Parameters
+
+    * `binary_input` - A hexadecimal string representing the Zarith-encoded integer.
+
+  ## Returns
+
+    A tuple containing:
+    - A map with the key `:int` and the decoded integer as a string value.
+    - The number of characters consumed from the input string.
+
+  ## Examples
+
+      iex> Tezex.Zarith.consume("a1d22c")
+      {%{int: "365729"}, 6}
+
+      iex> Tezex.Zarith.consume("e1d22c")
+      {%{int: "-365729"}, 6}
+
   """
-  @spec consume(nonempty_binary()) :: {%{int: binary()}, pos_integer()}
+  @spec consume(zarith_hex()) :: {%{int: String.t()}, pos_integer()}
   def consume(binary_input) when is_binary(binary_input) do
     {carved_int, rest} = find_int(binary_input)
 
