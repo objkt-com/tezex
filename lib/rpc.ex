@@ -132,21 +132,31 @@ defmodule Tezex.Rpc do
 
           extra_size = 1 + div(Fee.extra_size(), number_contents)
 
-          with {:ok, fee} <- Fee.calculate_fee(content, gas_limit_new, extra_size: extra_size) do
-            {:ok,
-             %{
-               content
-               | "gas_limit" => Integer.to_string(gas_limit_new),
-                 "storage_limit" => Integer.to_string(storage_limit_new),
-                 "fee" => Integer.to_string(fee)
-             }}
+          case Fee.calculate_fee(content, gas_limit_new, extra_size: extra_size) do
+            {:ok, fee} ->
+              {:ok,
+               %{
+                 content
+                 | "gas_limit" => Integer.to_string(gas_limit_new),
+                   "storage_limit" => Integer.to_string(storage_limit_new),
+                   "fee" => Integer.to_string(fee)
+               }}
+
+            err ->
+              err
           end
         else
-          content
+          {:ok, content}
         end
       end)
 
-    %{operation | "contents" => contents}
+    first_error = Enum.find(contents, &(elem(&1, 0) == :error))
+
+    if is_nil(first_error) do
+      %{operation | "contents" => Enum.map(contents, &elem(&1, 1))}
+    else
+      first_error
+    end
   end
 
   defp get_preapplied_operation_values(op, value_fun) do
