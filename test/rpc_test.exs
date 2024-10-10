@@ -4,7 +4,7 @@ defmodule Tezex.RpcTest do
   alias Tezex.Rpc
   doctest Tezex.Rpc, import: true
 
-  @endpoint "https://ghostnet.tezos.marigold.dev/"
+  @endpoint "https://ghostnet.ecadinfra.com"
   @ghostnet_1_address "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew"
   @ghostnet_1_pkey "edsk33h91RysSBUiYyEWbeRwo41YeZrtMPTNsuZ9nzsYWwiV8CFyKi"
   @ghostnet_2_address "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B"
@@ -143,6 +143,13 @@ defmodule Tezex.RpcTest do
   describe "send_operation/4" do
     @describetag :tezos
 
+    setup do
+      # Wait approximatively one block between each transaction
+      Process.sleep(:timer.seconds(10))
+
+      :ok
+    end
+
     test "a contract operation" do
       rpc = %Rpc{endpoint: @endpoint}
 
@@ -183,18 +190,21 @@ defmodule Tezex.RpcTest do
               [
                 %{
                   "amount" => "1000000000",
-                  "balance" => "896799001",
+                  "balance" => _,
                   "contract" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
-                  "id" => "proto.019-PtParisB.contract.balance_too_low",
+                  "id" => error_a,
                   "kind" => "temporary"
                 },
                 %{
-                  "amounts" => ["896799001", "1000000000"],
-                  "id" => "proto.019-PtParisB.tez.subtraction_underflow",
+                  "amounts" => [_, "1000000000"],
+                  "id" => error_b,
                   "kind" => "temporary"
                 }
               ]
             ]} =
              Rpc.send_operation(rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)
+
+    assert String.ends_with?(error_a, "balance_too_low"), error_a
+    assert String.ends_with?(error_b, "subtraction_underflow"), error_b
   end
 end
