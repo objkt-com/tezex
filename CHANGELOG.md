@@ -1,5 +1,11 @@
 # Changelog for Tezex
 
+## v3.0.0
+
+- [BREAKING]: `Tezex.Fee.calculate_fee/2` now returns a tuple
+- [BREAKING]: `Tezex.Rpc.forge_and_sign_operation/2` now returns a tuple
+- Refactor `Tezex.Fee`, `Tezex.ForgeOperation` and `Tezex.Rpc` to return tuples instead of crashing on assertions
+
 ## v2.0.0
 
 - [BREAKING]: `Tezex.Micheline` now only takes care of `PACK`ing and `UNPACK`ing, forging and unforging is now in `Tezex.Forge`
