@@ -4,7 +4,7 @@ defmodule Tezex.RpcTest do
   alias Tezex.Rpc
   doctest Tezex.Rpc, import: true
 
-  @endpoint "https://ghostnet.tezos.marigold.dev/"
+  @endpoint "https://ghostnet.ecadinfra.com"
   @ghostnet_1_address "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew"
   @ghostnet_1_pkey "edsk33h91RysSBUiYyEWbeRwo41YeZrtMPTNsuZ9nzsYWwiV8CFyKi"
   @ghostnet_2_address "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B"
@@ -75,7 +75,7 @@ defmodule Tezex.RpcTest do
     result =
       "6940b2318870c4b84862aef187c1bbcd4138170459e85092fe34be5d179f40ac6c00980d7cebb50d4b83a4e3307b3ca1b40ebe8f71ab00e308ab0b8102640000b75f0c30536bee108b068d90b151ce846aca11b1009bc207291f08c7117ea3a341328a036ce7bd5da996d9148cc491f96c3097748d7adcdb60599504ae5227aea4a6e69d536baaf96ae2bbb6c261a69d000b323f0a"
 
-    assert result == Rpc.forge_and_sign_operation(operation, @ghostnet_1_pkey)
+    assert {:ok, result} == Rpc.forge_and_sign_operation(operation, @ghostnet_1_pkey)
   end
 
   describe "fill_operation_fee/3" do
@@ -143,6 +143,13 @@ defmodule Tezex.RpcTest do
   describe "send_operation/4" do
     @describetag :tezos
 
+    setup do
+      # Wait approximatively one block between each transaction
+      Process.sleep(:timer.seconds(10))
+
+      :ok
+    end
+
     test "a contract operation" do
       rpc = %Rpc{endpoint: @endpoint}
 
@@ -183,18 +190,21 @@ defmodule Tezex.RpcTest do
               [
                 %{
                   "amount" => "1000000000",
-                  "balance" => "896799001",
+                  "balance" => _,
                   "contract" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
-                  "id" => "proto.019-PtParisB.contract.balance_too_low",
+                  "id" => error_a,
                   "kind" => "temporary"
                 },
                 %{
-                  "amounts" => ["896799001", "1000000000"],
-                  "id" => "proto.019-PtParisB.tez.subtraction_underflow",
+                  "amounts" => [_, "1000000000"],
+                  "id" => error_b,
                   "kind" => "temporary"
                 }
               ]
             ]} =
              Rpc.send_operation(rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)
+
+    assert String.ends_with?(error_a, "balance_too_low"), error_a
+    assert String.ends_with?(error_b, "subtraction_underflow"), error_b
   end
 end

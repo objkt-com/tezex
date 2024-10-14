@@ -131,20 +131,32 @@ defmodule Tezex.Rpc do
             end
 
           extra_size = 1 + div(Fee.extra_size(), number_contents)
-          fee = Fee.calculate_fee(content, gas_limit_new, extra_size: extra_size)
 
-          %{
-            content
-            | "gas_limit" => Integer.to_string(gas_limit_new),
-              "storage_limit" => Integer.to_string(storage_limit_new),
-              "fee" => Integer.to_string(fee)
-          }
+          case Fee.calculate_fee(content, gas_limit_new, extra_size: extra_size) do
+            {:ok, fee} ->
+              {:ok,
+               %{
+                 content
+                 | "gas_limit" => Integer.to_string(gas_limit_new),
+                   "storage_limit" => Integer.to_string(storage_limit_new),
+                   "fee" => Integer.to_string(fee)
+               }}
+
+            err ->
+              err
+          end
         else
-          content
+          {:ok, content}
         end
       end)
 
-    %{operation | "contents" => contents}
+    first_error = Enum.find(contents, &(elem(&1, 0) == :error))
+
+    if is_nil(first_error) do
+      %{operation | "contents" => Enum.map(contents, &elem(&1, 1))}
+    else
+      first_error
+    end
   end
 
   defp get_preapplied_operation_values(op, value_fun) do
@@ -176,42 +188,36 @@ defmodule Tezex.Rpc do
     transactions = if is_map(transactions), do: [transactions], else: transactions
     offset = Keyword.get(opts, :offset, 0)
 
-    {:ok, block_head} = get_block_at_offset(rpc, offset)
-
-    branch = binary_part(block_head["hash"], 0, 51)
-    protocol = block_head["protocol"]
-
-    counter = get_next_counter_for_account(rpc, wallet_address)
-    operation = prepare_operation(transactions, wallet_address, counter, branch)
-
-    case preapply_operation(rpc, operation, encoded_private_key, protocol) do
-      {:ok, preapplied_operations} ->
-        operation = fill_operation_fee(operation, preapplied_operations, opts)
-
-        payload = forge_and_sign_operation(operation, encoded_private_key)
-
-        inject_operation(rpc, payload)
-
-      err ->
-        err
+    with {:ok, block_head} <- get_block_at_offset(rpc, offset),
+         branch = binary_part(block_head["hash"], 0, 51),
+         protocol = block_head["protocol"],
+         counter = get_next_counter_for_account(rpc, wallet_address),
+         operation = prepare_operation(transactions, wallet_address, counter, branch),
+         {:ok, preapplied_operations} <-
+           preapply_operation(rpc, operation, encoded_private_key, protocol),
+         operation = fill_operation_fee(operation, preapplied_operations, opts),
+         {:ok, payload} <- forge_and_sign_operation(operation, encoded_private_key) do
+      inject_operation(rpc, payload)
     end
   end
 
   @doc """
   Sign the forged operation and returns the forged operation+signature payload to be injected.
   """
-  @spec forge_and_sign_operation(operation(), encoded_private_key()) :: nonempty_binary()
+  @spec forge_and_sign_operation(operation(), encoded_private_key()) ::
+          {:ok, nonempty_binary()} | {:error, nonempty_binary()}
   def forge_and_sign_operation(operation, encoded_private_key) do
-    forged_operation = ForgeOperation.operation_group(operation)
+    with {:ok, forged_operation} <- ForgeOperation.operation_group(operation) do
+      signature = Crypto.sign_operation(encoded_private_key, forged_operation)
 
-    signature = Crypto.sign_operation(encoded_private_key, forged_operation)
+      payload_signature =
+        signature
+        |> Crypto.decode_signature!()
+        |> Base.encode16(case: :lower)
 
-    payload_signature =
-      signature
-      |> Crypto.decode_signature!()
-      |> Base.encode16(case: :lower)
-
-    forged_operation <> payload_signature
+      signed_payload = forged_operation <> payload_signature
+      {:ok, signed_payload}
+    end
   end
 
   @doc """
@@ -223,10 +229,15 @@ defmodule Tezex.Rpc do
           | {:error, Jason.DecodeError.t()}
           | {:error, term()}
   def preapply_operation(%Rpc{} = rpc, operation, encoded_private_key, protocol) do
-    forged_operation = ForgeOperation.operation_group(operation)
-    signature = Crypto.sign_operation(encoded_private_key, forged_operation)
-    payload = [Map.merge(operation, %{"signature" => signature, "protocol" => protocol})]
+    with {:ok, forged_operation} <- ForgeOperation.operation_group(operation),
+         signature = Crypto.sign_operation(encoded_private_key, forged_operation),
+         payload = [Map.merge(operation, %{"signature" => signature, "protocol" => protocol})],
+         {:ok, preapplied_operations} <- do_preapply_operation(rpc, payload) do
+      {:ok, preapplied_operations}
+    end
+  end
 
+  defp do_preapply_operation(%Rpc{} = rpc, payload) do
     case post(rpc, "/blocks/head/helpers/preapply/operations", payload) do
       {:ok, [%{"contents" => preapplied_operations}]} ->
         applied? =
@@ -318,9 +329,8 @@ defmodule Tezex.Rpc do
   @spec get_balance(t(), nonempty_binary()) ::
           {:ok, pos_integer()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
   def get_balance(%Rpc{} = rpc, address) do
-    case get(rpc, "/blocks/head/context/contracts/#{address}/balance") do
-      {:ok, balance} -> {:ok, String.to_integer(balance)}
-      e -> e
+    with {:ok, balance} <- get(rpc, "/blocks/head/context/contracts/#{address}/balance") do
+      {:ok, String.to_integer(balance)}
     end
   end
 
@@ -398,6 +408,7 @@ defmodule Tezex.Rpc do
       "transfer_ticket" -> 3
       "smart_rollup_add_messages" -> 3
       "smart_rollup_execute_outbox_message" -> 3
+      kind -> raise "unknown operation kind: #{kind}"
     end
   end
 end
