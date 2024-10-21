@@ -239,7 +239,7 @@ defmodule Tezex.Rpc do
 
   defp do_preapply_operation(%Rpc{} = rpc, payload) do
     case post(rpc, "/blocks/head/helpers/preapply/operations", payload) do
-      {:ok, [%{"contents" => preapplied_operations}]} ->
+      {:ok, [%{"contents" => preapplied_operations}]} when is_list(preapplied_operations) ->
         applied? =
           Enum.all?(
             preapplied_operations,
@@ -275,8 +275,8 @@ defmodule Tezex.Rpc do
           {:error, errors}
         end
 
-      {:ok, result} ->
-        {:error, result}
+      {:ok, _result} ->
+        {:error, :preapply_failed}
 
       err ->
         err
