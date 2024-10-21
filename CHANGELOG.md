@@ -1,5 +1,9 @@
 # Changelog for Tezex
 
+## v3.0.1
+
+- [rpc]: prevent crash when preapply result is not a list
+
 ## v3.0.0
 
 - [BREAKING]: `Tezex.Fee.calculate_fee/2` now returns a tuple
