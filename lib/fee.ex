@@ -1,7 +1,7 @@
 defmodule Tezex.Fee do
   alias Tezex.ForgeOperation
 
-  @default_transaction_gas_limit 1451
+  @default_transaction_gas_limit 3_040
   @default_transaction_storage_limit 257
   @minimal_fees 100
   @minimal_mutez_per_byte 1
@@ -11,7 +11,7 @@ defmodule Tezex.Fee do
   @hard_gas_limit_per_operation 1_040_000
   def hard_gas_limit_per_operation, do: @hard_gas_limit_per_operation
 
-  @hard_storage_limit_per_operation 60000
+  @hard_storage_limit_per_operation 60_000
   def hard_storage_limit_per_operation, do: @hard_storage_limit_per_operation
 
   # size of serialized branch and signature + safe reserve

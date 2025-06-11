@@ -40,7 +40,7 @@ defmodule Tezex.RpcTest do
                  "counter" => "1123",
                  "destination" => "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B",
                  "fee" => "0",
-                 "gas_limit" => "1451",
+                 "gas_limit" => "3040",
                  "kind" => "transaction",
                  "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
                  "storage_limit" => "257"
