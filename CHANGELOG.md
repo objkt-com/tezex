@@ -1,5 +1,9 @@
 # Changelog for Tezex
 
+## v3.1.0
+
+- [rpc]: adapt constants to Rio protocol update
+
 ## v3.0.1
 
 - [rpc]: prevent crash when preapply result is not a list
