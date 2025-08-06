@@ -18,7 +18,9 @@ defmodule Tezex.Crypto.BLS do
 
   Partly ported from pytezos@439bafada8f063f9643c789f6154d4646674d66a
   > pytezos / MIT License / (c) 2020 Baking Bad / (c) 2018 Arthur Breitman
+
   and
+
   py_ecc@04151f01f59f902ab932a51e0ca0ebce3883fc51
   > py_ecc / MIT License / (c) (c) 2015 Vitalik Buterin
   """
