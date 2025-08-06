@@ -47,7 +47,7 @@ defmodule Tezex.Forge do
     # p256 pkh
     %{e_prefix: "tz3", e_len: 36, d_prefix: <<6, 161, 164>>, d_len: 20},
     # BLS-MinPk
-    %{e_prefix: "tz4", e_len: 36, d_prefix: <<6, 161, 16>>, d_len: 20},
+    %{e_prefix: "tz4", e_len: 36, d_prefix: <<6, 161, 166>>, d_len: 20},
     # originated address
     %{e_prefix: "KT1", e_len: 36, d_prefix: <<2, 90, 121>>, d_len: 20},
     # tx_rollup_l2_address

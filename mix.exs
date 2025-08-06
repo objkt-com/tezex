@@ -77,6 +77,7 @@ defmodule Tezex.MixProject do
       {:excoveralls, "~> 0.15.1", only: :test},
       {:finch, "~> 0.10"},
       {:jason, "~> 1.4"},
+      {:kcl, "~> 1.4"},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:ssl_verify_fun, "~> 1.1.0", [env: :prod, hex: "ssl_verify_fun", repo: "hexpm"]}
     ]

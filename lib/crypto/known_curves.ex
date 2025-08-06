@@ -9,12 +9,14 @@ defmodule Tezex.Crypto.KnownCurves do
 
   @secp256k1name :secp256k1
   @prime256v1name :prime256v1
+  @p256name :p256
 
-  @spec get_curve_by_name(:prime256v1 | :secp256k1) :: Curve.t()
+  @spec get_curve_by_name(:prime256v1 | :secp256k1 | :p256) :: Curve.t()
   def get_curve_by_name(name) do
     case name do
       @secp256k1name -> secp256k1()
       @prime256v1name -> prime256v1()
+      @p256name -> prime256v1()
     end
   end
 

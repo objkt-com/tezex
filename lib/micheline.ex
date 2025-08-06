@@ -83,7 +83,8 @@ defmodule Tezex.Micheline do
         |> binary_slice(12..-1//1)
 
       :key_hash ->
-        ("00" <> binary_slice(hex_value, 12..-1//1))
+        hex_value
+        |> binary_slice(12..-1//1)
         |> Forge.unforge_address(:hex)
 
       :address ->
