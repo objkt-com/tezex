@@ -131,4 +131,48 @@ defmodule Tezex.MichelineTest do
       assert result == %{"prim" => "Pair", "args" => [%{"int" => "1"}, %{"int" => "12"}]}
     end
   end
+
+  describe "tz4 address support" do
+    test "pack and unpack tz4 addresses" do
+      tz4_address = "tz4NWRt3aFyFU2Ydah917Eehxv6uf97j8tpZ"
+
+      # Test :address type
+      packed_address = Micheline.pack(tz4_address, :address)
+      unpacked_address = Micheline.unpack(packed_address, :address)
+      assert unpacked_address == tz4_address
+
+      # Test :key_hash type (this was the main issue that was fixed)
+      packed_key_hash = Micheline.pack(tz4_address, :key_hash)
+      unpacked_key_hash = Micheline.unpack(packed_key_hash, :key_hash)
+      assert unpacked_key_hash == tz4_address
+
+      # Both should produce the same packed format
+      assert packed_address == packed_key_hash
+      assert packed_address == "050a000000160003941e4aef9917ba8e31fc38a2abaec2f8a5c7d9ea"
+    end
+
+    test "round-trip all tezos address types with both address and key_hash" do
+      test_addresses = [
+        {"tz1LKpeN8ZSSFNyTWiBNaE4u4sjaq7J1Vz2z", "Ed25519"},
+        {"tz2BC83pvEAag6r2ZV7kPghNAbjFoiqhCvZx", "secp256k1"},
+        {"tz3bPFa6mGv8m4Ppn7w5KSDyAbEPwbJNpC9p", "P256"},
+        {"tz4NWRt3aFyFU2Ydah917Eehxv6uf97j8tpZ", "BLS"}
+      ]
+
+      for {address, curve_name} <- test_addresses do
+        # Test :address type
+        packed_address = Micheline.pack(address, :address)
+        unpacked_address = Micheline.unpack(packed_address, :address)
+        assert unpacked_address == address, "#{curve_name} address round-trip failed"
+
+        # Test :key_hash type
+        packed_key_hash = Micheline.pack(address, :key_hash)
+        unpacked_key_hash = Micheline.unpack(packed_key_hash, :key_hash)
+        assert unpacked_key_hash == address, "#{curve_name} key_hash round-trip failed"
+
+        # Both should produce the same packed format for implicit accounts
+        assert packed_address == packed_key_hash, "#{curve_name} address/key_hash mismatch"
+      end
+    end
+  end
 end

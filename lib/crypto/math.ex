@@ -2,6 +2,8 @@
 defmodule Tezex.Crypto.Math do
   @moduledoc false
 
+  import Bitwise
+
   alias Tezex.Crypto.Point
   alias Tezex.Crypto.Utils
 
@@ -17,7 +19,7 @@ defmodule Tezex.Crypto.Math do
   Returns:
   - `point` [`t:Tezex.Crypto.Point.t/0`]: point that represents the sum of First and Second Point
   """
-  @spec multiply(Point.t(), integer, integer, integer, integer) :: Point.t()
+  @spec multiply(Point.t(), integer(), integer(), integer(), integer()) :: Point.t()
   def multiply(p, n, c_n, c_a, c_p) do
     p
     |> to_jacobian()
@@ -36,7 +38,7 @@ defmodule Tezex.Crypto.Math do
   Returns:
   - `point` [`t:Tezex.Crypto.Point.t/0`]: point that represents the sum of First and Second Point
   """
-  @spec add(Point.t(), Point.t(), integer, integer) :: Point.t()
+  @spec add(Point.t(), Point.t(), integer(), integer()) :: Point.t()
   def add(p, q, c_a, c_p) do
     jacobian_add(to_jacobian(p), to_jacobian(q), c_a, c_p)
     |> from_jacobian(c_p)
@@ -60,6 +62,61 @@ defmodule Tezex.Crypto.Math do
     |> Utils.mod(n)
   end
 
+  @doc """
+  Computes modular inverse using extended Euclidean algorithm.
+  Returns {:ok, inverse} or {:error, :not_invertible}.
+  """
+  @spec mod_inverse(integer(), integer()) :: {:ok, integer()} | {:error, :not_invertible}
+  def mod_inverse(a, m) do
+    case extended_gcd(a, m) do
+      {1, x, _} -> {:ok, rem(x + m, m)}
+      _ -> {:error, :not_invertible}
+    end
+  end
+
+  @doc """
+  Extended Euclidean algorithm implementation.
+  Returns {gcd, x, y} where gcd = a*x + b*y.
+  """
+  @spec extended_gcd(integer(), integer()) :: {integer(), integer(), integer()}
+  def extended_gcd(a, b) do
+    extended_gcd(a, b, 1, 0, 0, 1)
+  end
+
+  @doc """
+  Fast modular exponentiation.
+  """
+  @spec mod_pow(integer(), integer(), integer()) :: integer()
+  def mod_pow(base, exp, mod) do
+    mod_pow(base, exp, mod, 1)
+  end
+
+  @doc """
+  Generic binary exponentiation using a multiplication function.
+  Useful for field elements or other algebraic structures.
+
+  - `base`: The base element
+  - `exp`: The exponent (non-negative integer)
+  - `one`: The multiplicative identity element
+  - `mul_fn`: Function to multiply two elements
+
+  Returns: base^exp
+  """
+  @spec binary_pow(any(), non_neg_integer(), any(), (any(), any() -> any())) :: any()
+  def binary_pow(_base, 0, one, _mul_fn), do: one
+  def binary_pow(base, 1, _one, _mul_fn), do: base
+
+  def binary_pow(base, exp, one, mul_fn) when rem(exp, 2) == 0 do
+    squared = mul_fn.(base, base)
+    binary_pow(squared, div(exp, 2), one, mul_fn)
+  end
+
+  def binary_pow(base, exp, one, mul_fn) do
+    squared = mul_fn.(base, base)
+    half_result = binary_pow(squared, div(exp, 2), one, mul_fn)
+    mul_fn.(base, half_result)
+  end
+
   defp inv_operator(lm, hm, low, high) when low > 1 do
     r = div(high, low)
 
@@ -70,18 +127,48 @@ defmodule Tezex.Crypto.Math do
     lm
   end
 
-  # Converts point back from Jacobian coordinates
+  defp extended_gcd(0, b, _, _, u1, v1), do: {b, u1, v1}
 
-  # - `p` [`t:Tezex.Crypto.Point.t/0`]: Point you want to add
-  # - `c_p` [`t:integer/0`]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
+  defp extended_gcd(a, b, u0, v0, u1, v1) do
+    q = div(b, a)
+    r = rem(b, a)
+    extended_gcd(r, a, u1 - q * u0, v1 - q * v0, u0, v0)
+  end
 
-  # Returns:
-  # - `point` [`t:Tezex.Crypto.Point.t/0`]: point in default coordinates
-  defp to_jacobian(p) do
+  defp mod_pow(_, 0, _, acc), do: acc
+
+  defp mod_pow(base, exp, mod, acc) do
+    if (exp &&& 1) == 1 do
+      mod_pow(rem(base * base, mod), exp >>> 1, mod, rem(acc * base, mod))
+    else
+      mod_pow(rem(base * base, mod), exp >>> 1, mod, acc)
+    end
+  end
+
+  @doc """
+  Converts a point from affine to Jacobian coordinates.
+
+  - `p` [`t:Tezex.Crypto.Point.t/0`]: Point in affine coordinates (z = 0)
+
+  Returns:
+  - `point` [`t:Tezex.Crypto.Point.t/0`]: point in Jacobian coordinates (z = 1)
+  """
+  @spec to_jacobian(Point.t()) :: Point.t()
+  def to_jacobian(p) do
     %Point{x: p.x, y: p.y, z: 1}
   end
 
-  defp from_jacobian(p, c_p) do
+  @doc """
+  Converts a point from Jacobian to affine coordinates.
+
+  - `p` [`t:Tezex.Crypto.Point.t/0`]: Point in Jacobian coordinates
+  - `c_p` [`t:integer/0`]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
+
+  Returns:
+  - `point` [`t:Tezex.Crypto.Point.t/0`]: point in affine coordinates (z = 0)
+  """
+  @spec from_jacobian(Point.t(), integer()) :: Point.t()
+  def from_jacobian(p, c_p) do
     z = inv(p.z, c_p)
 
     %Point{
@@ -90,17 +177,20 @@ defmodule Tezex.Crypto.Math do
     }
   end
 
-  # Doubles a point in elliptic curves
+  @doc """
+  Doubles a point in elliptic curves using Jacobian coordinates.
 
-  # - `p` [`t:Tezex.Crypto.Point.t/0`]: Point you want to double
-  # - `c_p` [`t:integer/0`]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
-  # - `c_a` [`t:integer/0`]: Coefficient of the first-order term of the equation Y^2 = X^3 + c_a*X + B (mod p)
+  - `p` [`t:Tezex.Crypto.Point.t/0`]: Point you want to double (in Jacobian coordinates)
+  - `c_a` [`t:integer/0`]: Coefficient of the first-order term of the equation Y^2 = X^3 + c_a*X + B (mod p)
+  - `c_p` [`t:integer/0`]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
 
-  # Returns:
-  # - `point` [`t:Tezex.Crypto.Point.t/0`]: point that represents the sum of First and Second Point
-  defp jacobian_double(%Point{y: 0}, _c_a, _c_p), do: %Point{x: 0, y: 0, z: 0}
+  Returns:
+  - `point` [`t:Tezex.Crypto.Point.t/0`]: doubled point in Jacobian coordinates
+  """
+  @spec jacobian_double(Point.t(), integer(), integer()) :: Point.t()
+  def jacobian_double(%Point{y: 0}, _c_a, _c_p), do: %Point{x: 0, y: 0, z: 0}
 
-  defp jacobian_double(p, c_a, c_p) do
+  def jacobian_double(p, c_a, c_p) do
     ysq =
       Utils.ipow(p.y, 2)
       |> Utils.mod(c_p)
@@ -128,19 +218,22 @@ defmodule Tezex.Crypto.Math do
     %Point{x: nx, y: ny, z: nz}
   end
 
-  # Adds two points in the elliptic curve
-  # - `p` [`t:Tezex.Crypto.Point.t/0`]: First Point you want to add
-  # - `q` [`t:Tezex.Crypto.Point.t/0`]: Second Point you want to add
-  # - `c_p` [`t:integer/0`]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
-  # - `c_a` [`t:integer/0`]: Coefficient of the first-order term of the equation Y^2 = X^3 + c_a*X + B (mod p)
+  @doc """
+  Adds two points in elliptic curves using Jacobian coordinates.
 
-  # Returns:
-  # - `point` [`t:Tezex.Crypto.Point.t/0`]: point that represents the sum of first and second Point
+  - `p` [`t:Tezex.Crypto.Point.t/0`]: First Point you want to add (in Jacobian coordinates)
+  - `q` [`t:Tezex.Crypto.Point.t/0`]: Second Point you want to add (in Jacobian coordinates)
+  - `c_a` [`t:integer/0`]: Coefficient of the first-order term of the equation Y^2 = X^3 + c_a*X + B (mod p)
+  - `c_p` [`t:integer/0`]: Prime number in the module of the equation Y^2 = X^3 + c_a*X + B (mod p)
+
+  Returns:
+  - `point` [`t:Tezex.Crypto.Point.t/0`]: point that represents the sum of first and second Point in Jacobian coordinates
+  """
   @spec jacobian_add(Point.t(), Point.t(), integer(), integer()) :: Point.t()
-  defp jacobian_add(%Point{y: 0}, q, _c_a, _c_p), do: q
-  defp jacobian_add(p, %Point{y: 0}, _c_a, _c_p), do: p
+  def jacobian_add(%Point{y: 0}, q, _c_a, _c_p), do: q
+  def jacobian_add(p, %Point{y: 0}, _c_a, _c_p), do: p
 
-  defp jacobian_add(p, q, c_a, c_p) do
+  def jacobian_add(p, q, c_a, c_p) do
     u1 =
       (p.x * Utils.ipow(q.z, 2))
       |> Utils.mod(c_p)
@@ -206,11 +299,11 @@ defmodule Tezex.Crypto.Math do
   # Returns:
   # - `point` [`t:Tezex.Crypto.Point.t/0`]: point that represents the sum of First and Second Point
   @spec jacobian_multiply(Point.t(), integer(), integer(), integer(), integer()) :: Point.t()
-  defp jacobian_multiply(_p, 0, _c_n, _c_a, _c_p) do
+  def jacobian_multiply(_p, 0, _c_n, _c_a, _c_p) do
     %Point{x: 0, y: 0, z: 1}
   end
 
-  defp jacobian_multiply(p, 1, _c_n, _c_a, _c_p) do
+  def jacobian_multiply(p, 1, _c_n, _c_a, _c_p) do
     if p.y == 0 do
       %Point{x: 0, y: 0, z: 1}
     else
@@ -218,7 +311,7 @@ defmodule Tezex.Crypto.Math do
     end
   end
 
-  defp jacobian_multiply(p, n, c_n, c_a, c_p) when n < 0 or n >= c_n do
+  def jacobian_multiply(p, n, c_n, c_a, c_p) when n < 0 or n >= c_n do
     if p.y == 0 do
       %Point{x: 0, y: 0, z: 1}
     else
@@ -226,16 +319,16 @@ defmodule Tezex.Crypto.Math do
     end
   end
 
-  defp jacobian_multiply(%Point{y: 0}, _n, _c_n, _c_a, _c_p) do
+  def jacobian_multiply(%Point{y: 0}, _n, _c_n, _c_a, _c_p) do
     %Point{x: 0, y: 0, z: 1}
   end
 
-  defp jacobian_multiply(p, n, c_n, c_a, c_p) when rem(n, 2) == 0 do
+  def jacobian_multiply(p, n, c_n, c_a, c_p) when rem(n, 2) == 0 do
     jacobian_multiply(p, div(n, 2), c_n, c_a, c_p)
     |> jacobian_double(c_a, c_p)
   end
 
-  defp jacobian_multiply(p, n, c_n, c_a, c_p) do
+  def jacobian_multiply(p, n, c_n, c_a, c_p) do
     jacobian_multiply(p, div(n, 2), c_n, c_a, c_p)
     |> jacobian_double(c_a, c_p)
     |> jacobian_add(p, c_a, c_p)

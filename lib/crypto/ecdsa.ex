@@ -44,7 +44,8 @@ defmodule Tezex.Crypto.ECDSA do
   Returns:
   - public_key [`t:Tezex.Crypto.PublicKey.t/0`]: a struct containing the public point and the curve;
   """
-  @spec decode_public_key(nonempty_binary, :prime256v1 | :secp256k1 | Curve.t()) :: PublicKey.t()
+  @spec decode_public_key(nonempty_binary(), :prime256v1 | :secp256k1 | Curve.t()) ::
+          PublicKey.t()
   def decode_public_key(compressed_pubkey, curve_name) when is_atom(curve_name) do
     curve = KnownCurves.get_curve_by_name(curve_name)
     decode_public_key(compressed_pubkey, curve)
@@ -54,7 +55,7 @@ defmodule Tezex.Crypto.ECDSA do
     %PublicKey{point: decode_point(compressed_pubkey, curve), curve: curve}
   end
 
-  @spec decode_point(nonempty_binary, Curve.t()) :: Point.t()
+  @spec decode_point(nonempty_binary(), Curve.t()) :: Point.t()
   def decode_point(compressed_pubkey, %Curve{name: :prime256v1} = curve) do
     prime = curve."P"
     b = curve."B"
@@ -138,8 +139,8 @@ defmodule Tezex.Crypto.ECDSA do
   Returns:
   - verified [`t:boolean/0`]: true if message, public key and signature are compatible, false otherwise
   """
-  @spec verify?(nonempty_binary, Signature.t(), PublicKey.t(), list()) :: boolean()
-  @spec verify?(nonempty_binary, Signature.t(), PublicKey.t()) :: boolean()
+  @spec verify?(nonempty_binary(), Signature.t(), PublicKey.t(), list()) :: boolean()
+  @spec verify?(nonempty_binary(), Signature.t(), PublicKey.t()) :: boolean()
   def verify?(message, signature, public_key, options \\ []) do
     %{hashfunc: hashfunc} =
       Enum.into(options, %{hashfunc: fn msg -> :crypto.hash(:sha256, msg) end})

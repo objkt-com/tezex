@@ -11,6 +11,7 @@ defmodule Tezex.Crypto do
   """
 
   alias Tezex.Crypto.Base58Check
+  alias Tezex.Crypto.BLS
   alias Tezex.Crypto.ECDSA
   alias Tezex.Crypto.KnownCurves
   alias Tezex.Crypto.PrivateKey
@@ -22,18 +23,22 @@ defmodule Tezex.Crypto do
   @prefix_edpk <<13, 15, 37, 217>>
   @prefix_sppk <<3, 254, 226, 86>>
   @prefix_p2pk <<3, 178, 139, 127>>
+  @prefix_blpk <<6, 149, 135, 204>>
   # public key hash
   @prefix_tz1 <<6, 161, 159>>
   @prefix_tz2 <<6, 161, 161>>
   @prefix_tz3 <<6, 161, 164>>
+  @prefix_tz4 <<6, 161, 166>>
   # private key
   @prefix_edsk <<43, 246, 78, 7>>
   @prefix_spsk <<17, 162, 224, 201>>
   @prefix_p2sk <<16, 81, 238, 189>>
+  @prefix_blsk <<3, 150, 192, 40>>
   # sig
   @prefix_edsig <<9, 245, 205, 134, 18>>
   @prefix_spsig <<13, 115, 101, 19, 63>>
   @prefix_p2sig <<54, 240, 44, 52>>
+  @prefix_blsig <<40, 171, 64, 207>>
   @prefix_sig <<4, 130, 43>>
 
   @typedoc """
@@ -69,7 +74,7 @@ defmodule Tezex.Crypto do
       iex> check_signature(address, "x" <> signature, "", public_key)
       {:error, :invalid_signature}
   """
-  @spec check_signature(binary, binary, binary, binary) ::
+  @spec check_signature(binary(), binary(), binary(), binary()) ::
           :ok
           | {:error,
              :address_mismatch | :invalid_pubkey_format | :invalid_signature | :bad_signature}
@@ -91,6 +96,7 @@ defmodule Tezex.Crypto do
       {:ok, <<@prefix_edpk, public_key::binary-size(32)>> <> _} -> {:ok, public_key}
       {:ok, <<@prefix_sppk, public_key::binary-size(33)>> <> _} -> {:ok, public_key}
       {:ok, <<@prefix_p2pk, public_key::binary-size(33)>> <> _} -> {:ok, public_key}
+      {:ok, <<@prefix_blpk, public_key::binary-size(48)>> <> _} -> {:ok, public_key}
       _ -> {:error, :invalid_pubkey_format}
     end
   end
@@ -98,7 +104,7 @@ defmodule Tezex.Crypto do
   @doc """
   Verify that `signature` is a valid signature for `message` signed with the private key corresponding to public key `pubkey`
   """
-  @spec verify_signature(binary, binary, binary) :: boolean()
+  @spec verify_signature(binary(), binary(), binary()) :: boolean()
   def verify_signature(signature, message, "ed" <> _ = pubkey) do
     # tz1…
     message_hash = hash_message(message)
@@ -137,6 +143,17 @@ defmodule Tezex.Crypto do
     ECDSA.verify?(message, signature, public_key, hashfunc: fn msg -> Blake2.hash2b(msg, 32) end)
   end
 
+  def verify_signature(signature, msg, "BL" <> _ = pubkey) do
+    # tz4…
+    with {:ok, decoded_sig} <- decode_signature(signature),
+         {:ok, public_key} <- extract_pubkey(pubkey),
+         message <- :binary.decode_hex(msg) do
+      BLS.verify(decoded_sig, message, public_key)
+    else
+      _ -> false
+    end
+  end
+
   def verify_signature(_, _, _) do
     {:error, :invalid_pubkey_format}
   end
@@ -167,13 +184,15 @@ defmodule Tezex.Crypto do
       {:error, :invalid_prefix}
       iex> validate_address("tz3bPFa6mGv8m4Ppn7w5KSDyAbEPwbJNpC9p")
       :ok
+      iex> validate_address("tz4NWRt3aFyFU2Ydah917Eehxv6uf97j8tpZ")
+      :ok
   """
   @spec validate_address(nonempty_binary()) ::
           :ok | {:error, :invalid_base58 | :invalid_checksum | :invalid_length | :invalid_prefix}
   def validate_address(address) do
     with {:ok, decoded} <- Base58Check.decode58(address),
          <<prefix::binary-size(3), pkh::binary-size(20), checksum::binary-size(4)>> <- decoded,
-         true <- prefix in [@prefix_tz1, @prefix_tz2, @prefix_tz3],
+         true <- prefix in [@prefix_tz1, @prefix_tz2, @prefix_tz3, @prefix_tz4],
          :ok <- check_checksum(checksum, <<prefix::binary-size(3), pkh::binary-size(20)>>) do
       :ok
     else
@@ -196,7 +215,7 @@ defmodule Tezex.Crypto do
       iex> check_address("tz2BC83pvEAag6r2ZV7kPghNAbjFoiqhCvZx", "x" <> pubkey)
       {:error, :invalid_pubkey_format}
   """
-  @spec check_address(nonempty_binary, nonempty_binary) ::
+  @spec check_address(nonempty_binary(), nonempty_binary()) ::
           :ok | {:error, :address_mismatch | :invalid_pubkey_format}
   def check_address(address, pubkey) do
     case derive_address(pubkey) do
@@ -221,7 +240,7 @@ defmodule Tezex.Crypto do
       iex> derive_address("p2pk65yRxCX65k6")
       {:error, :invalid_pubkey_format}
   """
-  @spec derive_address(nonempty_binary) ::
+  @spec derive_address(nonempty_binary()) ::
           {:ok, nonempty_binary} | {:error, :invalid_pubkey_format}
   def derive_address(pubkey) do
     case Base58Check.decode58(pubkey) do
@@ -236,6 +255,10 @@ defmodule Tezex.Crypto do
       # tz3 addresses: "p2pk" <> _
       {:ok, <<@prefix_p2pk, public_key::binary-size(33)>> <> _} ->
         derive_address(public_key, @prefix_tz3)
+
+      # tz4 addresses: "BLpk" <> _
+      {:ok, <<@prefix_blpk, public_key::binary-size(48)>> <> _} ->
+        derive_address(public_key, @prefix_tz4)
 
       _ ->
         {:error, :invalid_pubkey_format}
@@ -259,13 +282,14 @@ defmodule Tezex.Crypto do
       iex> encode_pubkey("tz1LPggcEZincSDQJUXrskwJPif4aJhWxMjd", "foo")
       :error
   """
-  @spec encode_pubkey(nonempty_binary, nonempty_binary) :: :error | {:ok, nonempty_binary}
+  @spec encode_pubkey(nonempty_binary(), nonempty_binary()) :: :error | {:ok, nonempty_binary()}
   def encode_pubkey(pkh, hex_pubkey) do
     prefix =
       case pkh do
         "tz1" <> _ -> @prefix_edpk
         "tz2" <> _ -> @prefix_sppk
         "tz3" <> _ -> @prefix_p2pk
+        "tz4" <> _ -> @prefix_blpk
         _ -> :error
       end
 
@@ -276,31 +300,45 @@ defmodule Tezex.Crypto do
   end
 
   defp decode_privkey({privkey, passphrase}) do
-    throw("not implemented")
     decode_privkey(privkey, passphrase)
   end
 
   defp decode_privkey(privkey, passphrase \\ nil) do
-    if binary_part(privkey, 2, 1) == "e" and is_nil(passphrase) do
+    # Check if this is an encrypted key
+    is_encrypted = binary_part(privkey, 2, 1) == "e"
+
+    if is_encrypted and is_nil(passphrase) do
       throw("missing passphrase")
     end
 
-    prefix =
-      case privkey do
-        "edsk" <> _ -> @prefix_edsk
-        "edes" <> _ -> @prefix_edsk
-        "spsk" <> _ -> @prefix_spsk
-        "spes" <> _ -> @prefix_spsk
-        "p2sk" <> _ -> @prefix_p2sk
-        "p2es" <> _ -> @prefix_p2sk
-      end
+    # Use the new PrivateKey.from_encoded_key for proper encrypted key support
+    case PrivateKey.from_encoded_key(privkey, passphrase) do
+      {:ok, private_key} ->
+        # Pad to ensure consistent 32-byte length
+        decoded_privkey = Utils.pad(private_key.secret, 32, :leading)
+        {privkey, decoded_privkey}
 
-    decoded_privkey =
-      Base58Check.decode58!(privkey)
-      |> binary_part(byte_size(prefix), 32)
-      |> Utils.pad(32, :leading)
+      {:error, _} ->
+        # Fallback to old implementation for backward compatibility
+        # This handles cases where the new implementation might not support a specific format
+        prefix =
+          case privkey do
+            "edsk" <> _ -> @prefix_edsk
+            "edes" <> _ -> @prefix_edsk
+            "spsk" <> _ -> @prefix_spsk
+            "spes" <> _ -> @prefix_spsk
+            "p2sk" <> _ -> @prefix_p2sk
+            "p2es" <> _ -> @prefix_p2sk
+            "BLsk" <> _ -> @prefix_blsk
+          end
 
-    {privkey, decoded_privkey}
+        decoded_privkey =
+          Base58Check.decode58!(privkey)
+          |> binary_part(byte_size(prefix), 32)
+          |> Utils.pad(32, :leading)
+
+        {privkey, decoded_privkey}
+    end
   end
 
   @doc """
@@ -351,8 +389,8 @@ defmodule Tezex.Crypto do
         r_bin = Integer.to_string(s.r, 16)
         s_bin = Integer.to_string(s.s, 16)
 
-        r_bin = Utils.pad(r_bin, 64, :leading)
-        s_bin = Utils.pad(s_bin, 64, :leading)
+        r_bin = String.pad_leading(r_bin, 64, "0")
+        s_bin = String.pad_leading(s_bin, 64, "0")
 
         signature = :binary.decode_hex(r_bin <> s_bin)
 
@@ -365,12 +403,21 @@ defmodule Tezex.Crypto do
         r_bin = Integer.to_string(s.r, 16)
         s_bin = Integer.to_string(s.s, 16)
 
-        r_bin = Utils.pad(r_bin, 64, :leading)
-        s_bin = Utils.pad(s_bin, 64, :leading)
+        r_bin = String.pad_leading(r_bin, 64, "0")
+        s_bin = String.pad_leading(s_bin, 64, "0")
 
         signature = :binary.decode_hex(r_bin <> s_bin)
 
         Base58Check.encode(signature, @prefix_p2sig)
+
+      "BL" <> _ ->
+        with {:ok, bls_key} <- BLS.deserialize_secret_key(decoded_key),
+             signature <- BLS.sign(bls_key, watermark <> msg) do
+          Base58Check.encode(signature, @prefix_blsig)
+        else
+          {:error, _} ->
+            raise RuntimeError, "Invalid BLS private key"
+        end
     end
   end
 
@@ -406,6 +453,21 @@ defmodule Tezex.Crypto do
     case Base58Check.decode58(sig) do
       {:ok, <<@prefix_sig, sig::binary-size(64)>> <> _} -> {:ok, sig}
       _ -> {:error, :invalid_signature}
+    end
+  end
+
+  def decode_signature("BLsig" <> _ = sig) do
+    case Base58Check.decode58(sig) do
+      # BLS signatures are: 4-byte prefix + 96-byte signature + 4-byte checksum = 104 bytes total
+      {:ok, <<@prefix_blsig, sig_data::binary-size(96), _checksum::binary-size(4)>>} ->
+        {:ok, sig_data}
+
+      # Fallback for different encoding formats
+      {:ok, <<@prefix_blsig, sig_data::binary-size(96)>> <> _} ->
+        {:ok, sig_data}
+
+      _ ->
+        {:error, :invalid_signature}
     end
   end
 

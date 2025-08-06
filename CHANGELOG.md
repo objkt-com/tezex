@@ -1,5 +1,11 @@
 # Changelog for Tezex
 
+## v3.2.0
+
+- [crypto] add a pure Elixir [BLS12-381](https://hexdocs.pm/tezex/Tezex.Crypto.BLS.html) implementation
+- [crypto] implement signing with encrypted p256 key
+- [crypto] implement tz4 (BLS12-381) support
+
 ## v3.1.0
 
 - [rpc]: adapt constants to Rio protocol update

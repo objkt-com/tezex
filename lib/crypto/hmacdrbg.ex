@@ -67,7 +67,7 @@ defmodule Tezex.Crypto.HMACDRBG do
     %{state | count: 1}
   end
 
-  @spec update(t(), binary | nil) :: t()
+  @spec update(t(), binary() | nil) :: t()
   defp update(state, seed) do
     seed = if is_nil(seed), do: nil, else: :binary.decode_hex(seed)
 
