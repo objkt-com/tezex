@@ -16,13 +16,6 @@ defmodule Tezex.MixProject do
       deps: deps(),
       start_permanent: Mix.env() == :prod,
       test_coverage: [tool: ExCoveralls],
-      preferred_cli_env: [
-        coveralls: :test,
-        "coveralls.detail": :test,
-        "coveralls.post": :test,
-        "coveralls.html": :test,
-        "test.watch": :test
-      ],
       docs: [
         source_ref: "v#{@version}",
         source_url: @url_github,
@@ -49,6 +42,18 @@ defmodule Tezex.MixProject do
       },
       licenses: ["MIT"],
       files: ~w(lib .formatter.exs mix.exs README* LICENSE*)
+    ]
+  end
+
+  def cli do
+    [
+      preferred_envs: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "test.watch": :test
+      ]
     ]
   end
 
