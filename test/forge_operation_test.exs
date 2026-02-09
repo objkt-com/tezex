@@ -87,7 +87,26 @@ defmodule Tezex.ForgeOperationTest do
       {:ok, result} = ForgeOperation.reveal(reveal)
 
       assert Base.encode16(result, case: :lower) ==
-               "6b0069ef8fb5d47d8a4321c94576a2316a632be8ce890094fe19904e00004c7b0501f6ea08f472b7e88791d3b8da49d64ac1e2c90f93c27e6531473305c6"
+               "6b0069ef8fb5d47d8a4321c94576a2316a632be8ce890094fe19904e00004c7b0501f6ea08f472b7e88791d3b8da49d64ac1e2c90f93c27e6531473305c600"
+    end
+
+    test "correctly encode a reveal operation with proof" do
+      reveal = %{
+        "kind" => "reveal",
+        "source" => "tz1VJAdH2HRUZWfohXW59NPYQKFMe1csroaX",
+        "fee" => "0",
+        "counter" => "425748",
+        "storage_limit" => "0",
+        "gas_limit" => "10000",
+        "public_key" => "edpkuDuXgPVJi3YK2GKL6avAK3GyjqyvpJjG9gTY5r2y72R7Teo65i",
+        "proof" =>
+          "BLsigBCNyUiH3Z5rtuWLyeRutnjeDSiZTcC1owGxXBEJUnfcAaCTciHLjH3asupDYbeu5NvmuUdKyV9r6DHhXQF2w1qiYo4tPVX11v9HnrracZ9DeZdeo8bKyHDDYDVVh4neP36Rs5iM26"
+      }
+
+      {:ok, result} = ForgeOperation.reveal(reveal)
+
+      assert Base.encode16(result, case: :lower) ==
+               "6b0069ef8fb5d47d8a4321c94576a2316a632be8ce890094fe19904e00004c7b0501f6ea08f472b7e88791d3b8da49d64ac1e2c90f93c27e6531473305c6ff00000060ab81a2768250f9c6a952aa23134493a7f8a04f5641bd1d16e7226bdad106c71d26cf431d180da0561230cc814599506707d4b00731f248b6bed38ee42681dc725df5e0b65344c4fd6418f1d7cf460d89d91883ae24afc0542937b6a37d595ff1"
     end
 
     test "correctly encode a contract origination operation" do

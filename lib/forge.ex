@@ -92,6 +92,8 @@ defmodule Tezex.Forge do
     %{e_prefix: "spsig", e_len: 99, d_prefix: <<13, 115, 101, 19, 63>>, d_len: 64},
     # p256 sig
     %{e_prefix: "p2sig", e_len: 98, d_prefix: <<54, 240, 44, 52>>, d_len: 64},
+    # BLS-MinPk sig
+    %{e_prefix: "BLsig", e_len: 142, d_prefix: <<40, 171, 64, 207>>, d_len: 96},
     # generic sig
     %{e_prefix: "sig", e_len: 96, d_prefix: <<4, 130, 43>>, d_len: 64},
     # chain id
@@ -245,21 +247,19 @@ defmodule Tezex.Forge do
   @spec forge_base58(binary(), io_encoding()) :: binary()
   @spec forge_base58(binary()) :: binary()
   def forge_base58(value, output_encoding \\ :bytes) do
-    prefix_len =
-      Enum.find_value(@base58_encodings, fn m ->
-        if byte_size(value) == m.e_len and String.starts_with?(value, m.e_prefix) do
-          byte_size(m.d_prefix)
-        else
-          false
-        end
+    encoding =
+      Enum.find(@base58_encodings, fn m ->
+        byte_size(value) == m.e_len and String.starts_with?(value, m.e_prefix)
       end)
 
-    if is_nil(prefix_len) do
+    if is_nil(encoding) do
       raise "Invalid encoding, prefix or length mismatch."
     end
 
+    prefix_len = byte_size(encoding.d_prefix)
+
     Base58Check.decode58!(value)
-    |> binary_slice(prefix_len, 32)
+    |> binary_slice(prefix_len, encoding.d_len)
     |> encode_output(output_encoding)
   end
 

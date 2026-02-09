@@ -125,7 +125,14 @@ defmodule Tezex.ForgeOperation do
           Forge.forge_nat(String.to_integer(content["counter"])),
           Forge.forge_nat(String.to_integer(content["gas_limit"])),
           Forge.forge_nat(String.to_integer(content["storage_limit"])),
-          Forge.forge_public_key(content["public_key"])
+          Forge.forge_public_key(content["public_key"]),
+          case Map.get(content, "proof") do
+            nil ->
+              Forge.forge_bool(false)
+
+            proof ->
+              [Forge.forge_bool(true), Forge.forge_array(Forge.forge_base58(proof))]
+          end
         ]
         |> IO.iodata_to_binary()
 
