@@ -233,6 +233,41 @@ defmodule Tezex.ForgeOperationTest do
     end
   end
 
+  describe "operations using the @operation_tags lookup" do
+    test "endorsement encodes the kind tag, not the kind string" do
+      assert {:ok, result} =
+               ForgeOperation.endorsement(%{"kind" => "endorsement", "level" => "100"})
+
+      # tag for "endorsement" is 0; level is forge_int32(100) = <<0,0,0,100>>
+      assert result == <<0, 0, 0, 0, 100>>
+    end
+
+    test "failing_noop encodes the kind tag, not the kind string" do
+      assert {:ok, result} =
+               ForgeOperation.failing_noop(%{"kind" => "failing_noop", "arbitrary" => "deadbeef"})
+
+      # tag for "failing_noop" is 17; "arbitrary" is wrapped in a forge_array
+      assert result == <<17, 0, 0, 0, 8, "deadbeef">>
+    end
+
+    test "endorsement_with_slot encodes the kind tag, not the kind string" do
+      assert {:ok, result} =
+               ForgeOperation.endorsement_with_slot(%{
+                 "kind" => "endorsement_with_slot",
+                 "endorsement" => %{
+                   "branch" => "BLWdshvgEYbtUaABnmqkMuyMezpfsu36DEJPDJN63CW3TFuk7bP",
+                   "operations" => %{"kind" => "endorsement", "level" => "100"},
+                   "signature" =>
+                     "edsigtqqVg7CM2ynDXRHUfVEdL4LxKAJ1xrM1poMPXZdwVQ3SQ6YBkqPcAuaGYbeqUTrg374dDNFvJKCVfMA7T1Vrotg91Hsuam"
+                 },
+                 "slot" => "1"
+               })
+
+      # tag for "endorsement_with_slot" is 10
+      assert <<10, _rest::binary>> = result
+    end
+  end
+
   test "validate_required_keys/2" do
     assert ForgeOperation.validate_required_keys(%{"a" => 1, "b" => 2}, ~w(a b)) == :ok
 

@@ -245,7 +245,10 @@ defmodule Tezex.ForgeOperation do
   def endorsement(content) do
     with :ok <- validate_required_keys(content, ~w(kind level)) do
       content =
-        [forge_tag(content["kind"]), Forge.forge_int32(String.to_integer(content["level"]))]
+        [
+          forge_tag(@operation_tags[content["kind"]]),
+          Forge.forge_int32(String.to_integer(content["level"]))
+        ]
         |> IO.iodata_to_binary()
 
       {:ok, content}
@@ -278,7 +281,7 @@ defmodule Tezex.ForgeOperation do
          {:ok, endorsement} <- inline_endorsement(content["endorsement"]) do
       content =
         [
-          forge_tag(content["kind"]),
+          forge_tag(@operation_tags[content["kind"]]),
           Forge.forge_array(endorsement),
           Forge.forge_int16(String.to_integer(content["slot"]))
         ]
@@ -292,7 +295,10 @@ defmodule Tezex.ForgeOperation do
   def failing_noop(content) do
     with :ok <- validate_required_keys(content, ~w(kind arbitrary)) do
       content =
-        [forge_tag(content["kind"]), Forge.forge_array(content["arbitrary"])]
+        [
+          forge_tag(@operation_tags[content["kind"]]),
+          Forge.forge_array(content["arbitrary"])
+        ]
         |> IO.iodata_to_binary()
 
       {:ok, content}
