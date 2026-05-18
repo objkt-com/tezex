@@ -1,5 +1,10 @@
 # Changelog for Tezex
 
+## v4.0.0
+
+- [BREAKING]: `Tezex.Rpc.get_counter_for_account/2` now returns a tuple
+- [rpc]: prevent crash when counter result is not an integer
+
 ## v3.2.0
 
 - [crypto] add a pure Elixir [BLS12-381](https://hexdocs.pm/tezex/Tezex.Crypto.BLS.html) implementation
