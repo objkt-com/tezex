@@ -191,7 +191,7 @@ defmodule Tezex.Rpc do
     with {:ok, block_head} <- get_block_at_offset(rpc, offset),
          branch = binary_part(block_head["hash"], 0, 51),
          protocol = block_head["protocol"],
-         counter = get_next_counter_for_account(rpc, wallet_address),
+         {:ok, counter} <- get_next_counter_for_account(rpc, wallet_address),
          operation = prepare_operation(transactions, wallet_address, counter, branch),
          {:ok, preapplied_operations} <-
            preapply_operation(rpc, operation, encoded_private_key, protocol),
@@ -296,9 +296,13 @@ defmodule Tezex.Rpc do
     end
   end
 
-  @spec get_next_counter_for_account(t(), nonempty_binary()) :: integer()
+  @spec get_next_counter_for_account(t(), nonempty_binary()) ::
+          {:ok, integer()} | {:error, :not_integer} | {:error, Finch.Error.t()}
   def get_next_counter_for_account(%Rpc{} = rpc, address) do
-    get_counter_for_account(rpc, address) + 1
+    case get_counter_for_account(rpc, address) do
+      {:error, _} = err -> err
+      n -> {:ok, n + 1}
+    end
   end
 
   @spec get_block(t()) ::

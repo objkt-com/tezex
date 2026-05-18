@@ -196,4 +196,14 @@ defmodule Tezex.ForgeTest do
     assert {:error, "Operation content is missing required keys: parameters.entrypoint"} =
              ForgeOperation.operation_group(opg)
   end
+
+  test "forge_contract without entrypoint" do
+    addr = "KT1XnTn74bUtxHfDtBmm2bGZAQfhPbvKWR8o"
+    with_entry = "KT1XnTn74bUtxHfDtBmm2bGZAQfhPbvKWR8o%foo"
+
+    # No entrypoint should be equivalent to %default
+    assert Forge.forge_contract(addr) == Forge.forge_address(addr)
+    # With entrypoint, expects address bytes followed by entrypoint string
+    assert Forge.forge_contract(with_entry) == Forge.forge_address(addr) <> "foo"
+  end
 end

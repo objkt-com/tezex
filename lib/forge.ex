@@ -352,7 +352,12 @@ defmodule Tezex.Forge do
   @spec forge_contract(binary(), io_encoding()) :: binary()
   @spec forge_contract(binary()) :: binary()
   def forge_contract(value, output_encoding \\ :bytes) do
-    [address, entrypoint] = String.split(value, "%", parts: 2)
+    {address, entrypoint} =
+      case String.split(value, "%", parts: 2) do
+        [addr, ep] -> {addr, ep}
+        [addr] -> {addr, nil}
+      end
+
     address_bytes = forge_address(address)
 
     if entrypoint != nil && entrypoint != "default" do
