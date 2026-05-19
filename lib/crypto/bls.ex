@@ -66,12 +66,13 @@ defmodule Tezex.Crypto.BLS do
       32
   """
   @spec from_seed(binary()) :: {:ok, t()} | {:error, :invalid_seed}
-  def from_seed(seed) when byte_size(seed) == @secret_key_size do
-    with {:ok, fr_element} <- Fr.from_bytes(seed),
-         false <- Fr.is_zero?(fr_element) do
-      {:ok, %__MODULE__{secret_key: fr_element}}
+  def from_seed(<<seed_int::big-unsigned-integer-size(256)>>) do
+    fr_element = Fr.from_integer(seed_int)
+
+    if Fr.is_zero?(fr_element) do
+      {:error, :invalid_seed}
     else
-      _ -> {:error, :invalid_seed}
+      {:ok, %__MODULE__{secret_key: fr_element}}
     end
   end
 
