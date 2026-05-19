@@ -222,45 +222,41 @@ defmodule Tezex.Crypto.PrivateKey do
       raise "invalid_key_length"
     end
 
-    # Decode from base58 and strip prefix
-    decoded_key =
+    # Decode from base58. decode58! raises FunctionClauseError on malformed
+    # base58; we translate only that to "invalid_base58". Other RuntimeErrors
+    # raised below ("invalid_length", "invalid_checksum",
+    # "unsupported_key_format") must propagate so callers see the real cause.
+    decoded_with_prefix_and_checksum =
       try do
-        # Use decode58! which includes checksum, then validate and remove it
-        decoded_with_prefix_and_checksum = Base58Check.decode58!(encoded_key_bytes)
-
-        # Find the prefix and expected data length from the encoding table
-        prefix_info = find_encoding_info(encoded_key)
-        prefix_len = byte_size(prefix_info.d_prefix)
-        expected_data_len = prefix_info.d_len
-
-        # Validate total length (prefix + data + 4-byte checksum)
-        expected_total_len = prefix_len + expected_data_len + 4
-
-        if byte_size(decoded_with_prefix_and_checksum) != expected_total_len do
-          raise "invalid_length"
-        end
-
-        # Extract prefix + data (without checksum)
-        prefix_and_data =
-          binary_part(decoded_with_prefix_and_checksum, 0, prefix_len + expected_data_len)
-
-        checksum =
-          binary_part(decoded_with_prefix_and_checksum, prefix_len + expected_data_len, 4)
-
-        # Validate checksum
-        computed_checksum =
-          :crypto.hash(:sha256, :crypto.hash(:sha256, prefix_and_data))
-          |> binary_part(0, 4)
-
-        if checksum != computed_checksum do
-          raise "invalid_checksum"
-        end
-
-        # Strip the prefix to get just the key data
-        binary_part(prefix_and_data, prefix_len, expected_data_len)
+        Base58Check.decode58!(encoded_key_bytes)
       rescue
-        _ -> raise "invalid_base58"
+        FunctionClauseError -> raise "invalid_base58"
       end
+
+    prefix_info = find_encoding_info(encoded_key)
+    prefix_len = byte_size(prefix_info.d_prefix)
+    expected_data_len = prefix_info.d_len
+    expected_total_len = prefix_len + expected_data_len + 4
+
+    if byte_size(decoded_with_prefix_and_checksum) != expected_total_len do
+      raise "invalid_length"
+    end
+
+    prefix_and_data =
+      binary_part(decoded_with_prefix_and_checksum, 0, prefix_len + expected_data_len)
+
+    checksum =
+      binary_part(decoded_with_prefix_and_checksum, prefix_len + expected_data_len, 4)
+
+    computed_checksum =
+      :crypto.hash(:sha256, :crypto.hash(:sha256, prefix_and_data))
+      |> binary_part(0, 4)
+
+    if checksum != computed_checksum do
+      raise "invalid_checksum"
+    end
+
+    decoded_key = binary_part(prefix_and_data, prefix_len, expected_data_len)
 
     # Extract secret key bytes
     secret_key_bytes =
