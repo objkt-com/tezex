@@ -78,16 +78,16 @@ defmodule Tezex.Crypto.BLS.Fq do
   @doc """
   Checks if a field element is zero.
   """
-  @spec is_zero?(t()) :: boolean()
-  def is_zero?(fq) do
+  @spec zero?(t()) :: boolean()
+  def zero?(fq) do
     fq == @zero
   end
 
   @doc """
   Checks if a field element is one.
   """
-  @spec is_one?(t()) :: boolean()
-  def is_one?(fq) do
+  @spec one?(t()) :: boolean()
+  def one?(fq) do
     fq == @one
   end
 
@@ -129,7 +129,7 @@ defmodule Tezex.Crypto.BLS.Fq do
   """
   @spec neg(t()) :: t()
   def neg(a) when byte_size(a) == 48 do
-    if is_zero?(a) do
+    if zero?(a) do
       @zero
     else
       a_int = to_integer(a)
@@ -152,7 +152,7 @@ defmodule Tezex.Crypto.BLS.Fq do
   """
   @spec inv(t()) :: {:ok, t()} | {:error, :not_invertible}
   def inv(a) when byte_size(a) == 48 do
-    with false <- is_zero?(a),
+    with false <- zero?(a),
          a_int = to_integer(a),
          {:ok, inv_int} <- Math.mod_inverse(a_int, @modulus) do
       {:ok, from_integer(inv_int)}

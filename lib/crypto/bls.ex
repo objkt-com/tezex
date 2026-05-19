@@ -69,7 +69,7 @@ defmodule Tezex.Crypto.BLS do
   def from_seed(<<seed_int::big-unsigned-integer-size(256)>>) do
     fr_element = Fr.from_integer(seed_int)
 
-    if Fr.is_zero?(fr_element) do
+    if Fr.zero?(fr_element) do
       {:error, :invalid_seed}
     else
       {:ok, %__MODULE__{secret_key: fr_element}}
@@ -122,7 +122,7 @@ defmodule Tezex.Crypto.BLS do
   def from_secret_exponent(secret) when is_integer(secret) and secret > 0 do
     fr_element = Fr.from_integer(secret)
 
-    if Fr.is_zero?(fr_element) do
+    if Fr.zero?(fr_element) do
       {:error, :invalid_secret}
     else
       {:ok, %__MODULE__{secret_key: fr_element}}
@@ -263,7 +263,7 @@ defmodule Tezex.Crypto.BLS do
       else
         # Non-infinity point: try to decompress and validate
         case G2.from_compressed_bytes(signature) do
-          {:ok, point} -> G2.is_on_curve?(point) and not G2.is_infinity?(point)
+          {:ok, point} -> G2.is_on_curve?(point) and not G2.infinity?(point)
           {:error, _} -> false
         end
       end
@@ -295,7 +295,7 @@ defmodule Tezex.Crypto.BLS do
       else
         # Try to decompress and validate the point
         case G1.from_compressed_bytes(pubkey) do
-          {:ok, point} -> G1.is_on_curve?(point) and not G1.is_infinity?(point)
+          {:ok, point} -> G1.is_on_curve?(point) and not G1.infinity?(point)
           {:error, _} -> false
         end
       end
@@ -312,8 +312,8 @@ defmodule Tezex.Crypto.BLS do
 
     with {:ok, pubkey_point} <- G1.from_compressed_bytes(public_key),
          {:ok, signature_point} <- G2.from_compressed_bytes(signature),
-         false <- G1.is_infinity?(pubkey_point),
-         false <- G2.is_infinity?(signature_point) do
+         false <- G1.infinity?(pubkey_point),
+         false <- G2.infinity?(signature_point) do
       # Hash the message to G2
       message_point = G2.hash_to_curve(message, ciphersuite)
 
@@ -458,7 +458,7 @@ defmodule Tezex.Crypto.BLS do
     secret_key_int = derive_key_with_hkdf(ikm, salt, key_info, 0)
     fr_element = Fr.from_integer(secret_key_int)
 
-    if Fr.is_zero?(fr_element) do
+    if Fr.zero?(fr_element) do
       derive_key_retry(ikm, salt, key_info, 1)
     else
       {:ok, fr_element}
@@ -471,7 +471,7 @@ defmodule Tezex.Crypto.BLS do
     secret_key_int = derive_key_with_hkdf(ikm, salt, key_info, iteration)
     fr_element = Fr.from_integer(secret_key_int)
 
-    if Fr.is_zero?(fr_element) do
+    if Fr.zero?(fr_element) do
       derive_key_retry(ikm, base_salt, key_info, iteration + 1)
     else
       {:ok, fr_element}

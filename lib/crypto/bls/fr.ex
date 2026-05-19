@@ -70,8 +70,8 @@ defmodule Tezex.Crypto.BLS.Fr do
   @doc """
   Checks if a field element is zero.
   """
-  @spec is_zero?(t()) :: boolean()
-  def is_zero?(fr) do
+  @spec zero?(t()) :: boolean()
+  def zero?(fr) do
     fr == zero()
   end
 end

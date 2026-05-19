@@ -38,26 +38,24 @@ defmodule Tezex.Crypto.BLS.Pairing do
   @spec pairing(G1.t(), G2.t(), boolean()) :: gt()
   def pairing(g1_point, g2_point, final_exponentiate) do
     # Handle special cases
-    if G1.is_zero?(g1_point) or G2.is_zero?(g2_point) do
-      Fq12.one()
-    else
-      # Verify points are on the correct curves
-      unless G1.is_on_curve?(g1_point) do
+    cond do
+      G1.zero?(g1_point) or G2.zero?(g2_point) ->
+        Fq12.one()
+
+      not G1.is_on_curve?(g1_point) ->
         raise ArgumentError, "G1 point is not on curve"
-      end
 
-      unless G2.is_on_curve?(g2_point) do
+      not G2.is_on_curve?(g2_point) ->
         raise ArgumentError, "G2 point is not on curve"
-      end
 
-      # Compute Miller loop
-      result = miller_loop(g2_point, g1_point)
+      true ->
+        result = miller_loop(g2_point, g1_point)
 
-      if final_exponentiate do
-        final_exponentiation(result)
-      else
-        result
-      end
+        if final_exponentiate do
+          final_exponentiation(result)
+        else
+          result
+        end
     end
   end
 
@@ -154,7 +152,7 @@ defmodule Tezex.Crypto.BLS.Pairing do
     m_den = Fq12.sub(Fq12.mul(x2, z1), Fq12.mul(x1, z2))
 
     cond do
-      not Fq12.is_zero?(m_den) ->
+      not Fq12.zero?(m_den) ->
         # Regular case: different points
         # Line equation: m * (xt - x1) - (yt - y1) = 0
         # Evaluated at T: m * (xt/zt - x1/z1) - (yt/zt - y1/z1)
@@ -167,7 +165,7 @@ defmodule Tezex.Crypto.BLS.Pairing do
         denominator = Fq12.mul(Fq12.mul(m_den, zt), z1)
         {line_val, denominator}
 
-      Fq12.is_zero?(m_num) ->
+      Fq12.zero?(m_num) ->
         # Doubling case: same point or point and its negative
         # Tangent slope: m = 3x1^2 / (2y1*z1)
         three = embed_fq12_from_integer(3)
@@ -238,9 +236,9 @@ defmodule Tezex.Crypto.BLS.Pairing do
   @doc """
   Checks if a GT element is the identity.
   """
-  @spec is_identity?(gt()) :: boolean()
-  def is_identity?(gt_element) do
-    Fq12.is_one?(gt_element)
+  @spec identity?(gt()) :: boolean()
+  def identity?(gt_element) do
+    Fq12.one?(gt_element)
   end
 
   @doc """
@@ -282,10 +280,10 @@ defmodule Tezex.Crypto.BLS.Pairing do
   def pairing_check(pubkey_point, h_msg_point, g1_generator, signature_point) do
     # First, ensure all points are valid (not zero and on curve)
     valid_points =
-      not G1.is_zero?(pubkey_point) and
-        not G2.is_zero?(h_msg_point) and
-        not G2.is_zero?(signature_point) and
-        not G1.is_zero?(g1_generator) and
+      not G1.zero?(pubkey_point) and
+        not G2.zero?(h_msg_point) and
+        not G2.zero?(signature_point) and
+        not G1.zero?(g1_generator) and
         G1.is_on_curve?(pubkey_point) and
         G2.is_on_curve?(h_msg_point) and
         G2.is_on_curve?(signature_point) and
@@ -301,7 +299,7 @@ defmodule Tezex.Crypto.BLS.Pairing do
       case Fq12.inv(e2) do
         {:ok, e2_inv} ->
           product = Fq12.mul(e1, e2_inv)
-          Fq12.is_one?(final_exponentiation(product))
+          Fq12.one?(final_exponentiation(product))
 
         {:error, _} ->
           false

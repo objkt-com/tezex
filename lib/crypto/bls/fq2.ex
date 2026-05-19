@@ -42,17 +42,17 @@ defmodule Tezex.Crypto.BLS.Fq2 do
   @doc """
   Checks if an Fq2 element is zero.
   """
-  @spec is_zero?(t()) :: boolean()
-  def is_zero?({a, b}) do
-    Fq.is_zero?(a) and Fq.is_zero?(b)
+  @spec zero?(t()) :: boolean()
+  def zero?({a, b}) do
+    Fq.zero?(a) and Fq.zero?(b)
   end
 
   @doc """
   Checks if an Fq2 element is one.
   """
-  @spec is_one?(t()) :: boolean()
-  def is_one?({a, b}) do
-    Fq.is_one?(a) and Fq.is_zero?(b)
+  @spec one?(t()) :: boolean()
+  def one?({a, b}) do
+    Fq.one?(a) and Fq.zero?(b)
   end
 
   @doc """
@@ -141,7 +141,7 @@ defmodule Tezex.Crypto.BLS.Fq2 do
   """
   @spec inv(t()) :: {:ok, t()} | {:error, :not_invertible}
   def inv(element) do
-    if is_zero?(element) do
+    if zero?(element) do
       {:error, :not_invertible}
     else
       case Fq.inv(norm(element)) do
@@ -215,7 +215,7 @@ defmodule Tezex.Crypto.BLS.Fq2 do
   @spec sqrt(t()) :: {:ok, t()} | {:error, :no_sqrt}
   def sqrt(element) do
     cond do
-      is_zero?(element) ->
+      zero?(element) ->
         {:ok, zero()}
 
       eq?(element, one()) ->

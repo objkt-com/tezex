@@ -113,16 +113,16 @@ defmodule Tezex.Crypto.BLS.Fq12 do
   @doc """
   Checks if an Fq12 element is zero.
   """
-  @spec is_zero?(t()) :: boolean()
-  def is_zero?(a) do
-    FqP.is_zero?(a)
+  @spec zero?(t()) :: boolean()
+  def zero?(a) do
+    FqP.zero?(a)
   end
 
   @doc """
   Checks if an Fq12 element is one.
   """
-  @spec is_one?(t()) :: boolean()
-  def is_one?(a) do
+  @spec one?(t()) :: boolean()
+  def one?(a) do
     FqP.eq?(a, one())
   end
 

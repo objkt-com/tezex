@@ -36,7 +36,7 @@ defmodule Tezex.Crypto.BLS.Fq12Test do
       for _ <- 1..10 do
         x = Fq.random()
 
-        unless Fq.is_zero?(x) do
+        unless Fq.zero?(x) do
           # Test that x^a * x^b = x^(a+b)
           a = :rand.uniform(20)
           b = :rand.uniform(20)
@@ -64,7 +64,7 @@ defmodule Tezex.Crypto.BLS.Fq12Test do
       for _ <- 1..20 do
         x = Fq.random()
 
-        unless Fq.is_zero?(x) do
+        unless Fq.zero?(x) do
           case Fq.inv(x) do
             {:ok, x_inv} ->
               # Test that x^1 * x^(-1) = 1
@@ -94,7 +94,7 @@ defmodule Tezex.Crypto.BLS.Fq12Test do
         a = random_fq2()
         b = random_fq2()
 
-        unless Fq2.is_zero?(a) or Fq2.is_zero?(b) do
+        unless Fq2.zero?(a) or Fq2.zero?(b) do
           # Test that (a * b) * inv(b) = a (when possible)
           product = Fq2.mul(a, b)
 
@@ -144,7 +144,7 @@ defmodule Tezex.Crypto.BLS.Fq12Test do
         # norm returns Fq element, product is Fq2, so we compare the real part
         {real_part, imag_part} = product
         assert Fq.eq?(norm_a, real_part)
-        assert Fq2.is_zero?({Fq.zero(), imag_part}) or Fq.is_zero?(imag_part)
+        assert Fq2.zero?({Fq.zero(), imag_part}) or Fq.zero?(imag_part)
 
         # Test conjugate of conjugate: conj(conj(a)) = a
         conj_conj_a = Fq2.conjugate(conj_a)
@@ -158,25 +158,25 @@ defmodule Tezex.Crypto.BLS.Fq12Test do
       for _ <- 1..100 do
         random_fq = Fq.random()
         # Random values should almost never be one
-        refute Fq.is_one?(random_fq)
+        refute Fq.one?(random_fq)
       end
     end
 
     test "is_one with zero" do
-      refute Fq.is_one?(Fq.zero())
-      refute Fq2.is_one?(Fq2.zero())
+      refute Fq.one?(Fq.zero())
+      refute Fq2.one?(Fq2.zero())
     end
 
     test "is_one with actual one" do
-      assert Fq.is_one?(Fq.one())
-      assert Fq2.is_one?(Fq2.one())
+      assert Fq.one?(Fq.one())
+      assert Fq2.one?(Fq2.one())
     end
 
     test "Fq2 is_one with random value" do
       for _ <- 1..100 do
         random_fq2 = random_fq2()
         # Random Fq2 values should almost never be one
-        refute Fq2.is_one?(random_fq2)
+        refute Fq2.one?(random_fq2)
       end
     end
   end
@@ -186,25 +186,25 @@ defmodule Tezex.Crypto.BLS.Fq12Test do
       for _ <- 1..100 do
         random_fq = Fq.random()
         # Random values should almost never be zero
-        refute Fq.is_zero?(random_fq)
+        refute Fq.zero?(random_fq)
       end
     end
 
     test "is_zero with actual zero" do
-      assert Fq.is_zero?(Fq.zero())
-      assert Fq2.is_zero?(Fq2.zero())
+      assert Fq.zero?(Fq.zero())
+      assert Fq2.zero?(Fq2.zero())
     end
 
     test "is_zero with one" do
-      refute Fq.is_zero?(Fq.one())
-      refute Fq2.is_zero?(Fq2.one())
+      refute Fq.zero?(Fq.one())
+      refute Fq2.zero?(Fq2.one())
     end
 
     test "Fq2 is_zero with random value" do
       for _ <- 1..100 do
         random_fq2 = random_fq2()
         # Random Fq2 values should almost never be zero
-        refute Fq2.is_zero?(random_fq2)
+        refute Fq2.zero?(random_fq2)
       end
     end
   end
@@ -261,7 +261,7 @@ defmodule Tezex.Crypto.BLS.Fq12Test do
       for _ <- 1..50 do
         a = Fq.random()
 
-        unless Fq.is_zero?(a) do
+        unless Fq.zero?(a) do
           case Fq.inv(a) do
             {:ok, a_inv} ->
               # a * a^(-1) = 1
