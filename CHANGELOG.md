@@ -1,5 +1,19 @@
 # Changelog for Tezex
 
+## vNext
+
+- [BREAKING][crypto/bls]: drop `is_` prefix from predicates (`is_zero?` → `zero?`, `is_one?` → `one?`, `is_infinity?` → `infinity?`) across `Fq`, `Fr`, `Fq2`, `Fq12`, `FqP`, `G1`, `G2`
+- [BREAKING][crypto/bls]: `Fq12.inv/1` and `FqP.inv/1` now return `{:ok, t} | {:error, :not_invertible}`
+- [BREAKING][crypto/bls]: `Fr.from_bytes/1` rejects out-of-range scalars with `:out_of_range` instead of silently reducing
+- [zarith]: raise `ArgumentError` on malformed/truncated hex input
+- [forge_operation]: fix `endorsement/1`, `endorsement_with_slot/1`, `failing_noop/1` (were passing the kind string to `forge_tag` and raising `ArgumentError`)
+- [crypto/private_key]: `from_encoded_key!/2` preserves the underlying error instead of masking everything as `invalid_base58`
+- [crypto/math]: `mod_inverse/2` handles negative input
+- [crypto/bls]: validate scalars in `Fr.from_bytes/1`, fix `Fq.sqrt/1` zero case, handle negative input in `Fq.from_integer/1`, use `from_integer` reduction in `BLS.from_seed/1`
+- [crypto/ecdsa]: fix `k` upper-bound check in signature generation (was comparing integer to binary, always false)
+- [crypto/nacl]: fix `crypto_secretbox_open/3` typespec to include `:invalid_nonce_length` and `:invalid_key_length`
+- [crypto/bls]: pre-compute Miller loop bits in pairing for faster verification
+
 ## v4.0.0
 
 - [BREAKING]: `Tezex.Rpc.get_counter_for_account/2` now returns a tuple
