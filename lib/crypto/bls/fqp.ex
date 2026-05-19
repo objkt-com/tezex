@@ -176,15 +176,15 @@ defmodule Tezex.Crypto.BLS.FqP do
 
   @doc """
   Computes the modular inverse using the extended Euclidean algorithm.
-  Polynomial inversion using extended Euclidean algorithm.
+  Returns `{:ok, inverse}` or `{:error, :not_invertible}` if the element is zero.
   """
-  @spec inv(t()) :: t()
+  @spec inv(t()) :: {:ok, t()} | {:error, :not_invertible}
   def inv(%{coeffs: coeffs, modulus_coeffs: modulus_coeffs} = elem) do
     if is_zero?(elem) do
-      raise ArithmeticError, "Cannot invert zero element"
+      {:error, :not_invertible}
+    else
+      {:ok, polynomial_inv(coeffs, modulus_coeffs)}
     end
-
-    polynomial_inv(coeffs, modulus_coeffs)
   end
 
   # Helper functions

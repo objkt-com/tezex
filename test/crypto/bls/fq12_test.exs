@@ -460,7 +460,7 @@ defmodule Tezex.Crypto.BLS.Fq12Test do
       five = Fq12.new([Fq.from_integer(5) | List.duplicate(Fq.zero(), 11)], @fq12_modulus_coeffs)
 
       # Compute inverse
-      five_inv = Fq12.inv(five)
+      {:ok, five_inv} = Fq12.inv(five)
 
       # Multiply should give 1
       result = Fq12.mul(five, five_inv)

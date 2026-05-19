@@ -281,7 +281,7 @@ defmodule Tezex.Crypto.BLS.Pairing do
   @doc """
   Inverts a GT element.
   """
-  @spec gt_inv(gt()) :: gt()
+  @spec gt_inv(gt()) :: {:ok, gt()} | {:error, :not_invertible}
   def gt_inv(gt_element) do
     Fq12.inv(gt_element)
   end
@@ -321,24 +321,17 @@ defmodule Tezex.Crypto.BLS.Pairing do
     if not valid_points do
       false
     else
-      try do
-        # Compute the two pairings for BLS verification
-        # e1 = e(signature, G1_generator)
-        e1 = pairing(g1_generator, signature_point, false)
+      e1 = pairing(g1_generator, signature_point, false)
+      e2 = pairing(pubkey_point, h_msg_point, false)
 
-        # e2 = e(H(msg), pubkey)
-        e2 = pairing(pubkey_point, h_msg_point, false)
+      # Check e1 == e2 by final-exponentiating e1 * e2^(-1) and testing for identity.
+      case Fq12.inv(e2) do
+        {:ok, e2_inv} ->
+          product = Fq12.mul(e1, e2_inv)
+          Fq12.is_one?(final_exponentiation(product))
 
-        # Final exponentiate the product: (e1 * e2^(-1))
-        # This is equivalent to checking e1 == e2
-        e2_inv = Fq12.inv(e2)
-        product = Fq12.mul(e1, e2_inv)
-        final_result = final_exponentiation(product)
-
-        # Check if the result is 1 (identity in GT)
-        Fq12.is_one?(final_result)
-      rescue
-        _ -> false
+        {:error, _} ->
+          false
       end
     end
   end

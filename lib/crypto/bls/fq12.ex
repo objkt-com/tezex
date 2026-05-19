@@ -86,19 +86,20 @@ defmodule Tezex.Crypto.BLS.Fq12 do
 
   @doc """
   Computes the modular inverse of an Fq12 element.
-  Uses the FqP inverse implementation.
+  Returns `{:ok, inverse}` or `{:error, :not_invertible}` if the element is zero.
   """
-  @spec inv(t()) :: t()
+  @spec inv(t()) :: {:ok, t()} | {:error, :not_invertible}
   def inv(a) do
     FqP.inv(a)
   end
 
   @doc """
-  Divides two Fq12 elements (a / b = a * b^(-1)).
+  Divides two Fq12 elements (a / b = a * b^(-1)). Raises if `b` is zero.
   """
   @spec field_div(t(), t()) :: t()
   def field_div(a, b) do
-    mul(a, inv(b))
+    {:ok, b_inv} = inv(b)
+    mul(a, b_inv)
   end
 
   @doc """
