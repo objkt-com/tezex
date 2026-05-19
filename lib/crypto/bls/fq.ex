@@ -182,20 +182,19 @@ defmodule Tezex.Crypto.BLS.Fq do
   @doc """
   Computes the square root of a field element if it exists.
   """
+  @sqrt_exp div(@modulus + 1, 4)
+
   @spec sqrt(t()) :: {:ok, t()} | {:error, :no_sqrt}
+  def sqrt(@zero), do: {:ok, @zero}
+
   def sqrt(a) when byte_size(a) == 48 do
-    # Use Tonelli-Shanks algorithm for square root
-    # Since q ≡ 3 (mod 4), we can use a^((q+1)/4)
-    with false <- is_zero?(a) and :is_zero,
-         3 <- rem(@modulus, 4),
-         exp = div(@modulus + 1, 4),
-         candidate = pow(a, exp),
-         # Verify it's actually a square root
-         true <- eq?(square(candidate), a) do
+    # q ≡ 3 (mod 4), so √a = a^((q+1)/4) when a is a quadratic residue.
+    candidate = pow(a, @sqrt_exp)
+
+    if eq?(square(candidate), a) do
       {:ok, candidate}
     else
-      :is_zero -> {:ok, @zero}
-      _ -> {:error, :no_sqrt}
+      {:error, :no_sqrt}
     end
   end
 
