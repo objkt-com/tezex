@@ -6,7 +6,8 @@ defmodule Tezex.ZarithTest do
 
   test "encode/decode" do
     n = 1_000_000_000_000
-    random = fn -> trunc(:rand.uniform(n) - n / 2) end
+    h = n / 2
+    random = fn -> trunc(:rand.uniform(n) - h) end
 
     Enum.each(1..5000, fn _ ->
       number = random.()
@@ -70,6 +71,27 @@ defmodule Tezex.ZarithTest do
     test "-610_913_435_200" do
       packed = "c0f9b9d4c723"
       assert {%{int: "-610913435200"}, byte_size(packed)} == Zarith.consume(packed)
+    end
+  end
+
+  describe "malformed input" do
+    test "raises on truncated input with continuation bit set" do
+      # 0x80: continuation=1, sign=0, tail=0, claims more bytes follow but none do
+      assert_raise ArgumentError, fn -> Zarith.decode("80") end
+      # 0xff: continuation=1, sign=1, tail=63, same truncation
+      assert_raise ArgumentError, fn -> Zarith.decode("ff") end
+      # Multi-byte truncation: first byte continues, second byte continues, then ends
+      assert_raise ArgumentError, fn -> Zarith.decode("8080") end
+    end
+
+    test "raises on empty input" do
+      assert_raise ArgumentError, fn -> Zarith.consume("") end
+      assert_raise ArgumentError, fn -> Zarith.decode("") end
+    end
+
+    test "raises on odd-length hex input" do
+      assert_raise ArgumentError, fn -> Zarith.consume("a1d22") end
+      assert_raise ArgumentError, fn -> Zarith.decode("a1d22") end
     end
   end
 end

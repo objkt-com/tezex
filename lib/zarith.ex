@@ -164,9 +164,13 @@ defmodule Tezex.Zarith do
   """
   @spec consume(zarith_hex()) :: {%{int: String.t()}, pos_integer()}
   def consume(binary_input) when is_binary(binary_input) do
+    if binary_input == "" or rem(byte_size(binary_input), 2) != 0 do
+      raise ArgumentError, "Zarith input must be a non-empty even-length hex string"
+    end
+
     {carved_int, rest} = find_int(binary_input)
 
-    consumed = String.length(binary_input) - String.length(rest)
+    consumed = byte_size(binary_input) - byte_size(rest)
 
     binary =
       carved_int
@@ -194,16 +198,18 @@ defmodule Tezex.Zarith do
     end
   end
 
-  defp find_int("", acc) do
-    {Enum.reverse(acc) |> Enum.join(""), ""}
+  defp find_int("", _acc) do
+    raise ArgumentError, "Zarith input truncated: continuation bit set with no following byte"
   end
 
-  defp read([<<_halt::1, sign::1, tail::integer-size(6)>> | rest]) do
-    bits =
-      for bits_part <- read_next(rest, [<<tail::integer-size(6)>>]), into: <<>> do
-        bits_part
+  defp read([<<halt::1, sign::1, tail::integer-size(6)>> | rest]) do
+    parts =
+      case halt do
+        0 -> [<<tail::integer-size(6)>>]
+        1 -> read_next(rest, [<<tail::integer-size(6)>>])
       end
 
+    bits = for p <- parts, into: <<>>, do: p
     bits_count = bit_size(bits)
     <<integer::integer-size(bits_count)>> = bits
 
@@ -221,8 +227,8 @@ defmodule Tezex.Zarith do
     [<<tail::integer-size(7)>> | acc]
   end
 
-  defp read_next(_, acc) do
-    acc
+  defp read_next([], _acc) do
+    raise ArgumentError, "Zarith input truncated: continuation bit set with no following byte"
   end
 
   defp hex_to_dec(hex) do
