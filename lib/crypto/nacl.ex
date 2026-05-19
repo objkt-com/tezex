@@ -21,7 +21,8 @@ defmodule Tezex.Crypto.NaCl do
   - `{:error, reason}` - Decryption failed
   """
   @spec crypto_secretbox_open(binary(), binary(), binary()) ::
-          {:ok, binary()} | {:error, :decryption_failed}
+          {:ok, binary()}
+          | {:error, :decryption_failed | :invalid_nonce_length | :invalid_key_length}
   def crypto_secretbox_open(_ciphertext, nonce, _key) when byte_size(nonce) != 24 do
     {:error, :invalid_nonce_length}
   end
