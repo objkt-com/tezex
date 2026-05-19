@@ -28,15 +28,7 @@ defmodule Tezex.Crypto.BLS.Fq do
   """
   @spec from_integer(integer()) :: t()
   def from_integer(n) when is_integer(n) do
-    # Handle negative integers by converting to positive modular equivalent
-    reduced =
-      if n >= 0 do
-        rem(n, @modulus)
-      else
-        # For negative n, compute n mod p as (p - ((-n) mod p)) mod p
-        @modulus - rem(-n, @modulus)
-      end
-
+    reduced = Integer.mod(n, @modulus)
     <<reduced::big-unsigned-integer-size(384)>>
   end
 
