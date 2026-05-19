@@ -266,14 +266,13 @@ defmodule Tezex.Crypto.BLS.G2 do
     cond do
       is_zero?(p1) -> p2
       is_zero?(p2) -> p1
-      eq?(p1, p2) -> double(p1)
-      true -> add_different(p1, p2)
+      true -> add_nonzero(p1, p2)
     end
   end
 
-  # Helper for adding two different points
-  # Optimized addition algorithm
-  defp add_different(p1, p2) do
+  # Add two non-zero points. Handles the same-point and inverse cases inline
+  # so we don't pay for an upfront eq?/2 (which redoes the same V1/V2/U1/U2 muls).
+  defp add_nonzero(p1, p2) do
     %{x: x1, y: y1, z: z1} = p1
     %{x: x2, y: y2, z: z2} = p2
 
