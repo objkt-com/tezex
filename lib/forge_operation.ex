@@ -53,8 +53,8 @@ defmodule Tezex.ForgeOperation do
     end
   end
 
-  defp forge_tag(tag) do
-    <<tag::size(8)>>
+  defp forge_tag(kind) do
+    <<Map.fetch!(@operation_tags, kind)::size(8)>>
   end
 
   @spec operation(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
@@ -100,7 +100,7 @@ defmodule Tezex.ForgeOperation do
     with :ok <- validate_required_keys(content, ~w(kind pkh secret)) do
       content =
         [
-          forge_tag(@operation_tags[content["kind"]]),
+          forge_tag(content["kind"]),
           binary_slice(Forge.forge_address(content["pkh"]), 2..-1//1),
           Base.decode16!(content["secret"], case: :mixed)
         ]
@@ -119,7 +119,7 @@ defmodule Tezex.ForgeOperation do
            ) do
       content =
         [
-          forge_tag(@operation_tags[content["kind"]]),
+          forge_tag(content["kind"]),
           Forge.forge_address(content["source"], :bytes, true),
           Forge.forge_nat(String.to_integer(content["fee"])),
           Forge.forge_nat(String.to_integer(content["counter"])),
@@ -155,7 +155,7 @@ defmodule Tezex.ForgeOperation do
               )) || :ok do
       content =
         [
-          forge_tag(@operation_tags[content["kind"]]),
+          forge_tag(content["kind"]),
           Forge.forge_address(content["source"], :bytes, true),
           Forge.forge_nat(String.to_integer(content["fee"])),
           Forge.forge_nat(String.to_integer(content["counter"])),
@@ -190,7 +190,7 @@ defmodule Tezex.ForgeOperation do
            ) do
       content =
         [
-          forge_tag(@operation_tags[content["kind"]]),
+          forge_tag(content["kind"]),
           Forge.forge_address(content["source"], :bytes, true),
           Forge.forge_nat(String.to_integer(content["fee"])),
           Forge.forge_nat(String.to_integer(content["counter"])),
@@ -221,7 +221,7 @@ defmodule Tezex.ForgeOperation do
            ) do
       content =
         [
-          forge_tag(@operation_tags[content["kind"]]),
+          forge_tag(content["kind"]),
           Forge.forge_address(content["source"], :bytes, true),
           Forge.forge_nat(String.to_integer(content["fee"])),
           Forge.forge_nat(String.to_integer(content["counter"])),
@@ -245,7 +245,10 @@ defmodule Tezex.ForgeOperation do
   def endorsement(content) do
     with :ok <- validate_required_keys(content, ~w(kind level)) do
       content =
-        [forge_tag(content["kind"]), Forge.forge_int32(String.to_integer(content["level"]))]
+        [
+          forge_tag(content["kind"]),
+          Forge.forge_int32(String.to_integer(content["level"]))
+        ]
         |> IO.iodata_to_binary()
 
       {:ok, content}
@@ -292,7 +295,10 @@ defmodule Tezex.ForgeOperation do
   def failing_noop(content) do
     with :ok <- validate_required_keys(content, ~w(kind arbitrary)) do
       content =
-        [forge_tag(content["kind"]), Forge.forge_array(content["arbitrary"])]
+        [
+          forge_tag(content["kind"]),
+          Forge.forge_array(content["arbitrary"])
+        ]
         |> IO.iodata_to_binary()
 
       {:ok, content}
@@ -308,7 +314,7 @@ defmodule Tezex.ForgeOperation do
            ) do
       content =
         [
-          forge_tag(@operation_tags[content["kind"]]),
+          forge_tag(content["kind"]),
           Forge.forge_address(content["source"], :bytes, true),
           Forge.forge_nat(String.to_integer(content["fee"])),
           Forge.forge_nat(String.to_integer(content["counter"])),
@@ -331,7 +337,7 @@ defmodule Tezex.ForgeOperation do
            ) do
       content =
         [
-          forge_tag(@operation_tags[content["kind"]]),
+          forge_tag(content["kind"]),
           Forge.forge_address(content["source"], :bytes, true),
           Forge.forge_nat(String.to_integer(content["fee"])),
           Forge.forge_nat(String.to_integer(content["counter"])),
@@ -359,7 +365,7 @@ defmodule Tezex.ForgeOperation do
            ) do
       content =
         [
-          forge_tag(@operation_tags[content["kind"]]),
+          forge_tag(content["kind"]),
           Forge.forge_address(content["source"], :bytes, true),
           Forge.forge_nat(String.to_integer(content["fee"])),
           Forge.forge_nat(String.to_integer(content["counter"])),
@@ -388,7 +394,7 @@ defmodule Tezex.ForgeOperation do
            ) do
       content =
         [
-          forge_tag(@operation_tags[content["kind"]]),
+          forge_tag(content["kind"]),
           Forge.forge_address(content["source"], :bytes, true),
           Forge.forge_nat(String.to_integer(content["fee"])),
           Forge.forge_nat(String.to_integer(content["counter"])),

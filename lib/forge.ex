@@ -360,7 +360,7 @@ defmodule Tezex.Forge do
 
     address_bytes = forge_address(address)
 
-    if entrypoint != nil && entrypoint != "default" do
+    if entrypoint != nil and entrypoint != "default" do
       address_bytes <> entrypoint
     else
       address_bytes
