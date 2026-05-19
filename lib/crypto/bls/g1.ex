@@ -36,7 +36,7 @@ defmodule Tezex.Crypto.BLS.G1 do
   @i_8 Fq.from_integer(8)
 
   @doc """
-  Creates a G1 point from Jacobian coordinates.
+  Creates a G1 point from projective coordinates (X, Y, Z).
   """
   @spec new(Fq.t(), Fq.t(), Fq.t()) :: t()
   def new(x, y, z) do

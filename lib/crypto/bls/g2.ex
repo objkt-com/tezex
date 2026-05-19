@@ -5,8 +5,8 @@ defmodule Tezex.Crypto.BLS.G2 do
   This is the elliptic curve E'(Fq2): y² = x³ + 4(1 + u) over the quadratic extension Fq2.
   G2 is used for signatures in BLS signatures.
 
-  Points are represented in Jacobian coordinates (X, Y, Z) where:
-  - Affine coordinates: (X/Z², Y/Z³) over Fq2
+  Points are represented in projective coordinates (X, Y, Z) where:
+  - Affine coordinates: (X/Z, Y/Z) over Fq2
   - Point at infinity: (1, 1, 0)
   """
 
