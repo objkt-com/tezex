@@ -34,7 +34,7 @@ defmodule Tezex.Crypto.BLS.G1Test do
 
     test "is not zero" do
       generator = G1.generator()
-      refute G1.is_infinity?(generator)
+      refute G1.infinity?(generator)
     end
   end
 
@@ -54,7 +54,7 @@ defmodule Tezex.Crypto.BLS.G1Test do
 
       result = G1.mul(generator, zero)
 
-      assert G1.is_infinity?(result)
+      assert G1.infinity?(result)
     end
 
     test "2 * generator equals generator + generator" do
@@ -96,7 +96,7 @@ defmodule Tezex.Crypto.BLS.G1Test do
       assert compressed == <<0xC0>> <> <<0::376>>
 
       assert {:ok, decompressed} = G1.from_compressed_bytes(compressed)
-      assert G1.is_infinity?(decompressed)
+      assert G1.infinity?(decompressed)
     end
   end
 
@@ -228,7 +228,7 @@ defmodule Tezex.Crypto.BLS.G1Test do
       curve_order = Constants.curve_order()
       curve_order_fr = Fr.from_integer(curve_order)
       mul_g1_order = G1.mul(g1, curve_order_fr)
-      assert G1.is_infinity?(mul_g1_order)
+      assert G1.infinity?(mul_g1_order)
     end
   end
 
@@ -256,7 +256,7 @@ defmodule Tezex.Crypto.BLS.G1Test do
 
       # assert is_inf(neg(Z1))
       neg_z1 = G1.negate(z1)
-      assert G1.is_infinity?(neg_z1)
+      assert G1.infinity?(neg_z1)
     end
   end
 

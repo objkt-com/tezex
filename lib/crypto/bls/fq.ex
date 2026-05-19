@@ -28,15 +28,7 @@ defmodule Tezex.Crypto.BLS.Fq do
   """
   @spec from_integer(integer()) :: t()
   def from_integer(n) when is_integer(n) do
-    # Handle negative integers by converting to positive modular equivalent
-    reduced =
-      if n >= 0 do
-        rem(n, @modulus)
-      else
-        # For negative n, compute n mod p as (p - ((-n) mod p)) mod p
-        @modulus - rem(-n, @modulus)
-      end
-
+    reduced = Integer.mod(n, @modulus)
     <<reduced::big-unsigned-integer-size(384)>>
   end
 
@@ -86,16 +78,16 @@ defmodule Tezex.Crypto.BLS.Fq do
   @doc """
   Checks if a field element is zero.
   """
-  @spec is_zero?(t()) :: boolean()
-  def is_zero?(fq) do
+  @spec zero?(t()) :: boolean()
+  def zero?(fq) do
     fq == @zero
   end
 
   @doc """
   Checks if a field element is one.
   """
-  @spec is_one?(t()) :: boolean()
-  def is_one?(fq) do
+  @spec one?(t()) :: boolean()
+  def one?(fq) do
     fq == @one
   end
 
@@ -137,7 +129,7 @@ defmodule Tezex.Crypto.BLS.Fq do
   """
   @spec neg(t()) :: t()
   def neg(a) when byte_size(a) == 48 do
-    if is_zero?(a) do
+    if zero?(a) do
       @zero
     else
       a_int = to_integer(a)
@@ -160,7 +152,7 @@ defmodule Tezex.Crypto.BLS.Fq do
   """
   @spec inv(t()) :: {:ok, t()} | {:error, :not_invertible}
   def inv(a) when byte_size(a) == 48 do
-    with false <- is_zero?(a),
+    with false <- zero?(a),
          a_int = to_integer(a),
          {:ok, inv_int} <- Math.mod_inverse(a_int, @modulus) do
       {:ok, from_integer(inv_int)}
@@ -190,20 +182,19 @@ defmodule Tezex.Crypto.BLS.Fq do
   @doc """
   Computes the square root of a field element if it exists.
   """
+  @sqrt_exp div(@modulus + 1, 4)
+
   @spec sqrt(t()) :: {:ok, t()} | {:error, :no_sqrt}
+  def sqrt(@zero), do: {:ok, @zero}
+
   def sqrt(a) when byte_size(a) == 48 do
-    # Use Tonelli-Shanks algorithm for square root
-    # Since q ≡ 3 (mod 4), we can use a^((q+1)/4)
-    with false <- is_zero?(a) and :is_zero,
-         3 <- rem(@modulus, 4),
-         exp = div(@modulus + 1, 4),
-         candidate = pow(a, exp),
-         # Verify it's actually a square root
-         true <- eq?(square(candidate), a) do
+    # q ≡ 3 (mod 4), so √a = a^((q+1)/4) when a is a quadratic residue.
+    candidate = pow(a, @sqrt_exp)
+
+    if eq?(square(candidate), a) do
       {:ok, candidate}
     else
-      :is_zero -> {:ok, @zero}
-      _ -> {:error, :no_sqrt}
+      {:error, :no_sqrt}
     end
   end
 

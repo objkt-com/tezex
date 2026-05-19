@@ -96,7 +96,7 @@ defmodule Tezex.Crypto.BLS.FqP do
         top_pos = degree + exp
         top = Map.get(acc_map, top_pos, @zero)
 
-        if Fq.is_zero?(top) do
+        if Fq.zero?(top) do
           acc_map
         else
           # Remove the high-degree term
@@ -157,9 +157,9 @@ defmodule Tezex.Crypto.BLS.FqP do
   @doc """
   Checks if the element is zero.
   """
-  @spec is_zero?(t()) :: boolean()
-  def is_zero?(%{coeffs: coeffs}) do
-    Enum.all?(coeffs, &Fq.is_zero?/1)
+  @spec zero?(t()) :: boolean()
+  def zero?(%{coeffs: coeffs}) do
+    Enum.all?(coeffs, &Fq.zero?/1)
   end
 
   @doc """
@@ -176,15 +176,15 @@ defmodule Tezex.Crypto.BLS.FqP do
 
   @doc """
   Computes the modular inverse using the extended Euclidean algorithm.
-  Polynomial inversion using extended Euclidean algorithm.
+  Returns `{:ok, inverse}` or `{:error, :not_invertible}` if the element is zero.
   """
-  @spec inv(t()) :: t()
+  @spec inv(t()) :: {:ok, t()} | {:error, :not_invertible}
   def inv(%{coeffs: coeffs, modulus_coeffs: modulus_coeffs} = elem) do
-    if is_zero?(elem) do
-      raise ArithmeticError, "Cannot invert zero element"
+    if zero?(elem) do
+      {:error, :not_invertible}
+    else
+      {:ok, polynomial_inv(coeffs, modulus_coeffs)}
     end
-
-    polynomial_inv(coeffs, modulus_coeffs)
   end
 
   # Helper functions
@@ -276,7 +276,7 @@ defmodule Tezex.Crypto.BLS.FqP do
   defp deg_helper(_p, 0), do: 0
 
   defp deg_helper(p, d) do
-    if Fq.is_zero?(Enum.at(p, d)) and d > 0 do
+    if Fq.zero?(Enum.at(p, d)) and d > 0 do
       deg_helper(p, d - 1)
     else
       d

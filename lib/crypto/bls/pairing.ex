@@ -38,26 +38,24 @@ defmodule Tezex.Crypto.BLS.Pairing do
   @spec pairing(G1.t(), G2.t(), boolean()) :: gt()
   def pairing(g1_point, g2_point, final_exponentiate) do
     # Handle special cases
-    if G1.is_zero?(g1_point) or G2.is_zero?(g2_point) do
-      Fq12.one()
-    else
-      # Verify points are on the correct curves
-      unless G1.is_on_curve?(g1_point) do
+    cond do
+      G1.zero?(g1_point) or G2.zero?(g2_point) ->
+        Fq12.one()
+
+      not G1.is_on_curve?(g1_point) ->
         raise ArgumentError, "G1 point is not on curve"
-      end
 
-      unless G2.is_on_curve?(g2_point) do
+      not G2.is_on_curve?(g2_point) ->
         raise ArgumentError, "G2 point is not on curve"
-      end
 
-      # Compute Miller loop
-      result = miller_loop(g2_point, g1_point, final_exponentiate)
+      true ->
+        result = miller_loop(g2_point, g1_point)
 
-      if final_exponentiate do
-        final_exponentiation(result)
-      else
-        result
-      end
+        if final_exponentiate do
+          final_exponentiation(result)
+        else
+          result
+        end
     end
   end
 
@@ -67,66 +65,39 @@ defmodule Tezex.Crypto.BLS.Pairing do
 
   Core algorithm for optimal ATE pairing computation.
   """
-  @spec miller_loop(G2.t(), G1.t(), boolean()) :: gt()
-  def miller_loop(q_point, p_point, _final_exponentiate) do
-    # Cast P to Fq12 for line function evaluations
+  @spec miller_loop(G2.t(), G1.t()) :: gt()
+  def miller_loop(q_point, p_point) do
     cast_p = cast_point_to_fq12(p_point)
-
-    # Initialize Miller loop variables
-    # twist_R = twist_Q = twist(Q)
     twist_q = apply_twist(q_point)
-    r_point = q_point
-    f_num = Fq12.one()
-    f_den = Fq12.one()
 
-    # Main Miller loop
-    # for v in pseudo_binary_encoding[62::-1]:
-    Constants.pseudo_binary_encoding()
-    # Take first 63 elements (0..62)
-    |> Enum.take(63)
-    # Reverse to match [62::-1]
-    |> Enum.reverse()
-    |> Enum.reduce({r_point, f_num, f_den}, fn bit, {r, f_n, f_d} ->
-      # Apply twist to current R for line function
-      twist_r = apply_twist(r)
+    initial = {q_point, Fq12.one(), Fq12.one()}
 
-      # _n, _d = linefunc(twist_R, twist_R, cast_P)
-      {line_num, line_den} = line_function_fq12(twist_r, twist_r, cast_p)
+    {_r, f_n, f_d} =
+      Enum.reduce(Constants.miller_loop_bits(), initial, fn bit, {r, f_n, f_d} ->
+        miller_step(bit, r, f_n, f_d, q_point, twist_q, cast_p)
+      end)
 
-      # f_num = f_num * f_num * _n
-      # f_den = f_den * f_den * _d
-      new_f_n = Fq12.mul(Fq12.mul(f_n, f_n), line_num)
-      new_f_d = Fq12.mul(Fq12.mul(f_d, f_d), line_den)
+    Fq12.field_div(f_n, f_d)
+  end
 
-      # R = double(R)
-      doubled_r = G2.double(r)
+  defp miller_step(bit, r, f_n, f_d, q_point, twist_q, cast_p) do
+    twist_r = apply_twist(r)
+    {line_num, line_den} = line_function_fq12(twist_r, twist_r, cast_p)
 
-      # twist_R = twist(R)
-      doubled_twist_r = apply_twist(doubled_r)
+    f_n = Fq12.mul(Fq12.mul(f_n, f_n), line_num)
+    f_d = Fq12.mul(Fq12.mul(f_d, f_d), line_den)
 
-      # Add step if bit is 1
-      if bit == 1 do
-        # _n, _d = linefunc(twist_R, twist_Q, cast_P)
-        # Note: using doubled_twist_r which is twist(doubled_R)
+    doubled_r = G2.double(r)
+
+    case bit do
+      1 ->
+        doubled_twist_r = apply_twist(doubled_r)
         {add_line_num, add_line_den} = line_function_fq12(doubled_twist_r, twist_q, cast_p)
+        {G2.add(doubled_r, q_point), Fq12.mul(f_n, add_line_num), Fq12.mul(f_d, add_line_den)}
 
-        # f_num = f_num * _n
-        # f_den = f_den * _d
-        final_f_n = Fq12.mul(new_f_n, add_line_num)
-        final_f_d = Fq12.mul(new_f_d, add_line_den)
-
-        # R = add(R, Q)
-        added_r = G2.add(doubled_r, q_point)
-
-        {added_r, final_f_n, final_f_d}
-      else
-        {doubled_r, new_f_n, new_f_d}
-      end
-    end)
-    |> then(fn {_final_r, final_f_n, final_f_d} ->
-      # f = f_num / f_den
-      Fq12.field_div(final_f_n, final_f_d)
-    end)
+      _ ->
+        {doubled_r, f_n, f_d}
+    end
   end
 
   @doc """
@@ -181,7 +152,7 @@ defmodule Tezex.Crypto.BLS.Pairing do
     m_den = Fq12.sub(Fq12.mul(x2, z1), Fq12.mul(x1, z2))
 
     cond do
-      not Fq12.is_zero?(m_den) ->
+      not Fq12.zero?(m_den) ->
         # Regular case: different points
         # Line equation: m * (xt - x1) - (yt - y1) = 0
         # Evaluated at T: m * (xt/zt - x1/z1) - (yt/zt - y1/z1)
@@ -194,7 +165,7 @@ defmodule Tezex.Crypto.BLS.Pairing do
         denominator = Fq12.mul(Fq12.mul(m_den, zt), z1)
         {line_val, denominator}
 
-      Fq12.is_zero?(m_num) ->
+      Fq12.zero?(m_num) ->
         # Doubling case: same point or point and its negative
         # Tangent slope: m = 3x1^2 / (2y1*z1)
         three = embed_fq12_from_integer(3)
@@ -220,8 +191,8 @@ defmodule Tezex.Crypto.BLS.Pairing do
   end
 
   defp embed_fq12_from_integer(n) do
-    fq_element = Fq.from_integer(n)
-    embed_fq_to_fq12(fq_element)
+    Fq.from_integer(n)
+    |> embed_fq_to_fq12()
   end
 
   @doc """
@@ -265,9 +236,9 @@ defmodule Tezex.Crypto.BLS.Pairing do
   @doc """
   Checks if a GT element is the identity.
   """
-  @spec is_identity?(gt()) :: boolean()
-  def is_identity?(gt_element) do
-    Fq12.is_one?(gt_element)
+  @spec identity?(gt()) :: boolean()
+  def identity?(gt_element) do
+    Fq12.one?(gt_element)
   end
 
   @doc """
@@ -281,7 +252,7 @@ defmodule Tezex.Crypto.BLS.Pairing do
   @doc """
   Inverts a GT element.
   """
-  @spec gt_inv(gt()) :: gt()
+  @spec gt_inv(gt()) :: {:ok, gt()} | {:error, :not_invertible}
   def gt_inv(gt_element) do
     Fq12.inv(gt_element)
   end
@@ -309,10 +280,10 @@ defmodule Tezex.Crypto.BLS.Pairing do
   def pairing_check(pubkey_point, h_msg_point, g1_generator, signature_point) do
     # First, ensure all points are valid (not zero and on curve)
     valid_points =
-      not G1.is_zero?(pubkey_point) and
-        not G2.is_zero?(h_msg_point) and
-        not G2.is_zero?(signature_point) and
-        not G1.is_zero?(g1_generator) and
+      not G1.zero?(pubkey_point) and
+        not G2.zero?(h_msg_point) and
+        not G2.zero?(signature_point) and
+        not G1.zero?(g1_generator) and
         G1.is_on_curve?(pubkey_point) and
         G2.is_on_curve?(h_msg_point) and
         G2.is_on_curve?(signature_point) and
@@ -321,24 +292,17 @@ defmodule Tezex.Crypto.BLS.Pairing do
     if not valid_points do
       false
     else
-      try do
-        # Compute the two pairings for BLS verification
-        # e1 = e(signature, G1_generator)
-        e1 = pairing(g1_generator, signature_point, false)
+      e1 = pairing(g1_generator, signature_point, false)
+      e2 = pairing(pubkey_point, h_msg_point, false)
 
-        # e2 = e(H(msg), pubkey)
-        e2 = pairing(pubkey_point, h_msg_point, false)
+      # Check e1 == e2 by final-exponentiating e1 * e2^(-1) and testing for identity.
+      case Fq12.inv(e2) do
+        {:ok, e2_inv} ->
+          product = Fq12.mul(e1, e2_inv)
+          Fq12.one?(final_exponentiation(product))
 
-        # Final exponentiate the product: (e1 * e2^(-1))
-        # This is equivalent to checking e1 == e2
-        e2_inv = Fq12.inv(e2)
-        product = Fq12.mul(e1, e2_inv)
-        final_result = final_exponentiation(product)
-
-        # Check if the result is 1 (identity in GT)
-        Fq12.is_one?(final_result)
-      rescue
-        _ -> false
+        {:error, _} ->
+          false
       end
     end
   end

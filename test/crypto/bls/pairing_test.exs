@@ -24,7 +24,7 @@ defmodule Tezex.Crypto.BLS.PairingTest do
 
       # assert p1 * pn1 == 1
       product = Fq12.mul(p1, pn1)
-      assert Fq12.is_one?(product)
+      assert Fq12.one?(product)
     end
 
     test "pairing output order" do
@@ -36,7 +36,7 @@ defmodule Tezex.Crypto.BLS.PairingTest do
 
       # assert p1**curve_order == 1
       p1_pow_order = Fq12.pow(p1, @curve_order)
-      assert Fq12.is_one?(p1_pow_order)
+      assert Fq12.one?(p1_pow_order)
     end
 
     test "pairing bilinearity on G1" do

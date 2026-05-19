@@ -14,7 +14,7 @@ defmodule Tezex.Crypto.BLS.G2Test do
 
     test "is not zero" do
       generator = G2.generator()
-      refute G2.is_infinity?(generator)
+      refute G2.infinity?(generator)
     end
   end
 
@@ -34,7 +34,7 @@ defmodule Tezex.Crypto.BLS.G2Test do
 
       result = G2.mul(generator, zero)
 
-      assert G2.is_infinity?(result)
+      assert G2.infinity?(result)
     end
   end
 
@@ -62,7 +62,7 @@ defmodule Tezex.Crypto.BLS.G2Test do
       assert compressed == <<0xC0, 0::376, 0::384>>
 
       assert {:ok, decompressed} = G2.from_compressed_bytes(compressed)
-      assert G2.is_infinity?(decompressed)
+      assert G2.infinity?(decompressed)
     end
   end
 
@@ -106,7 +106,7 @@ defmodule Tezex.Crypto.BLS.G2Test do
       point = G2.hash_to_curve(test_message, ciphersuite)
 
       assert G2.is_on_curve?(point)
-      refute G2.is_infinity?(point)
+      refute G2.infinity?(point)
     end
   end
 
@@ -343,14 +343,14 @@ defmodule Tezex.Crypto.BLS.G2Test do
       curve_order = Constants.curve_order()
       curve_order_fr = Fr.from_integer(curve_order)
       mul_g2_order = G2.mul(g2, curve_order_fr)
-      assert G2.is_infinity?(mul_g2_order)
+      assert G2.infinity?(mul_g2_order)
 
       # assert not is_inf(multiply(G2, 2 * field_modulus - curve_order))
       field_modulus = Constants.field_modulus()
       special_scalar = 2 * field_modulus - curve_order
       special_scalar_fr = Fr.from_integer(special_scalar)
       mul_g2_special = G2.mul(g2, special_scalar_fr)
-      refute G2.is_infinity?(mul_g2_special)
+      refute G2.infinity?(mul_g2_special)
 
       # assert is_on_curve(multiply(G2, 9), b2)
       assert G2.is_on_curve?(mul_g2_9)
@@ -381,7 +381,7 @@ defmodule Tezex.Crypto.BLS.G2Test do
 
       # assert is_inf(neg(Z2))
       neg_z2 = G2.negate(z2)
-      assert G2.is_infinity?(neg_z2)
+      assert G2.infinity?(neg_z2)
     end
   end
 end

@@ -145,40 +145,44 @@ defmodule Tezex.Crypto.ECDSA do
     %{hashfunc: hashfunc} =
       Enum.into(options, %{hashfunc: fn msg -> :crypto.hash(:sha256, msg) end})
 
-    number_message =
-      hashfunc.(message)
-      |> Utils.number_from_string()
-
     curve_data = public_key.curve
-
-    inv = Math.inv(signature.s, curve_data."N")
-
-    v =
-      Math.add(
-        Math.multiply(
-          curve_data."G",
-          Utils.mod(number_message * inv, curve_data."N"),
-          curve_data."N",
-          curve_data."A",
-          curve_data."P"
-        ),
-        Math.multiply(
-          public_key.point,
-          Utils.mod(signature.r * inv, curve_data."N"),
-          curve_data."N",
-          curve_data."A",
-          curve_data."P"
-        ),
-        curve_data."A",
-        curve_data."P"
-      )
+    n = curve_data."N"
 
     cond do
-      signature.r < 1 or signature.r >= curve_data."N" -> false
-      signature.s < 1 or signature.s >= curve_data."N" -> false
-      Point.is_at_infinity?(v) -> false
-      Utils.mod(v.x, curve_data."N") != signature.r -> false
-      true -> true
+      signature.r < 1 or signature.r >= n ->
+        false
+
+      signature.s < 1 or signature.s >= n ->
+        false
+
+      true ->
+        number_message =
+          hashfunc.(message)
+          |> Utils.number_from_string()
+
+        inv = Math.inv(signature.s, n)
+
+        v =
+          Math.add(
+            Math.multiply(
+              curve_data."G",
+              Utils.mod(number_message * inv, n),
+              n,
+              curve_data."A",
+              curve_data."P"
+            ),
+            Math.multiply(
+              public_key.point,
+              Utils.mod(signature.r * inv, n),
+              n,
+              curve_data."A",
+              curve_data."P"
+            ),
+            curve_data."A",
+            curve_data."P"
+          )
+
+        not Point.is_at_infinity?(v) and Utils.mod(v.x, n) == signature.r
     end
   end
 
@@ -203,25 +207,25 @@ defmodule Tezex.Crypto.ECDSA do
 
   defp generate_signature(drbg, secret, message, curve_data) do
     {k, drbg} = HMACDRBG.generate(drbg, 32)
-    nh = curve_data."N" >>> 1
-    ns1 = :binary.encode_unsigned(curve_data."N" - 1)
+    n = curve_data."N"
+    nh = n >>> 1
 
     k =
       k
       |> :binary.decode_unsigned()
-      |> Utils.truncate_to_n(curve_data."N", true)
+      |> Utils.truncate_to_n(n, true)
 
-    with true <- not (k <= 1 or k >= ns1),
-         kp = Math.multiply(curve_data."G", k, curve_data."N", curve_data."A", curve_data."P"),
+    with true <- k > 1 and k < n - 1,
+         kp = Math.multiply(curve_data."G", k, n, curve_data."A", curve_data."P"),
          false <- Point.is_at_infinity?(kp),
-         r = rem(kp.x, curve_data."N"),
+         r = rem(kp.x, n),
          true <- r != 0,
-         s = Math.inv(k, curve_data."N") * (r * :binary.decode_unsigned(secret) + message),
-         s = rem(s, curve_data."N"),
+         s = Math.inv(k, n) * (r * :binary.decode_unsigned(secret) + message),
+         s = rem(s, n),
          true <- s != 0 do
       s =
         if s > nh do
-          curve_data."N" - s
+          n - s
         else
           s
         end

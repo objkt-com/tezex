@@ -67,9 +67,12 @@ defmodule Tezex.Crypto.Math do
   Returns {:ok, inverse} or {:error, :not_invertible}.
   """
   @spec mod_inverse(integer(), integer()) :: {:ok, integer()} | {:error, :not_invertible}
-  def mod_inverse(a, m) do
-    case extended_gcd(a, m) do
-      {1, x, _} -> {:ok, rem(x + m, m)}
+  def mod_inverse(a, m) when m > 0 do
+    # Normalize a to [0, m) so extended_gcd returns a positive gcd.
+    a_pos = Integer.mod(a, m)
+
+    case extended_gcd(a_pos, m) do
+      {1, x, _} -> {:ok, Integer.mod(x, m)}
       _ -> {:error, :not_invertible}
     end
   end

@@ -36,7 +36,7 @@ defmodule Tezex.Crypto.BLS.G1 do
   @i_8 Fq.from_integer(8)
 
   @doc """
-  Creates a G1 point from Jacobian coordinates.
+  Creates a G1 point from projective coordinates (X, Y, Z).
   """
   @spec new(Fq.t(), Fq.t(), Fq.t()) :: t()
   def new(x, y, z) do
@@ -65,16 +65,16 @@ defmodule Tezex.Crypto.BLS.G1 do
   @doc """
   Checks if a point is the point at infinity.
   """
-  @spec is_zero?(t()) :: boolean()
-  def is_zero?(%{z: z}) do
-    Fq.is_zero?(z)
+  @spec zero?(t()) :: boolean()
+  def zero?(%{z: z}) do
+    Fq.zero?(z)
   end
 
   @doc """
-  Alias for is_zero?/1 for compatibility.
+  Alias for zero?/1 for compatibility.
   """
-  @spec is_infinity?(t()) :: boolean()
-  def is_infinity?(point), do: is_zero?(point)
+  @spec infinity?(t()) :: boolean()
+  def infinity?(point), do: zero?(point)
 
   @doc """
   Checks if a point is on the curve using Jacobian coordinates.
@@ -82,7 +82,7 @@ defmodule Tezex.Crypto.BLS.G1 do
   """
   @spec is_on_curve?(t()) :: boolean()
   def is_on_curve?(point) do
-    if is_zero?(point) do
+    if zero?(point) do
       true
     else
       %{x: x, y: y, z: z} = point
@@ -106,7 +106,7 @@ defmodule Tezex.Crypto.BLS.G1 do
   """
   @spec double(t()) :: t()
   def double(point) do
-    if is_zero?(point) do
+    if zero?(point) do
       zero()
     else
       %{x: x, y: y, z: z} = point
@@ -137,8 +137,8 @@ defmodule Tezex.Crypto.BLS.G1 do
   @spec add(t(), t()) :: t()
   def add(p1, p2) do
     cond do
-      is_zero?(p1) -> p2
-      is_zero?(p2) -> p1
+      zero?(p1) -> p2
+      zero?(p2) -> p1
       true -> add_projective_algorithm(p1, p2)
     end
   end
@@ -188,7 +188,7 @@ defmodule Tezex.Crypto.BLS.G1 do
   """
   @spec negate(t()) :: t()
   def negate(point) do
-    if is_zero?(point) do
+    if zero?(point) do
       zero()
     else
       new(point.x, Fq.neg(point.y), point.z)
@@ -231,8 +231,8 @@ defmodule Tezex.Crypto.BLS.G1 do
   @spec eq?(t(), t()) :: boolean()
   def eq?(p1, p2) do
     cond do
-      is_zero?(p1) and is_zero?(p2) -> true
-      is_zero?(p1) or is_zero?(p2) -> false
+      zero?(p1) and zero?(p2) -> true
+      zero?(p1) or zero?(p2) -> false
       true -> eq_different?(p1, p2)
     end
   end
@@ -261,7 +261,7 @@ defmodule Tezex.Crypto.BLS.G1 do
   """
   @spec to_affine(t()) :: {:ok, {Fq.t(), Fq.t()}} | {:error, :point_at_infinity}
   def to_affine(point) do
-    with false <- is_zero?(point),
+    with false <- zero?(point),
          %{x: x, y: y, z: z} = point,
          {:ok, z_inv} <- Fq.inv(z) do
       affine_x = Fq.mul(x, z_inv)
@@ -292,7 +292,7 @@ defmodule Tezex.Crypto.BLS.G1 do
   """
   @spec to_compressed_bytes(t()) :: binary()
   def to_compressed_bytes(point) do
-    with false <- is_zero?(point),
+    with false <- zero?(point),
          {:ok, {x, y}} <- to_affine(point) do
       x_int = Fq.to_integer(x)
       y_int = Fq.to_integer(y)

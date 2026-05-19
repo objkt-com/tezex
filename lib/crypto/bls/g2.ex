@@ -5,8 +5,8 @@ defmodule Tezex.Crypto.BLS.G2 do
   This is the elliptic curve E'(Fq2): y² = x³ + 4(1 + u) over the quadratic extension Fq2.
   G2 is used for signatures in BLS signatures.
 
-  Points are represented in Jacobian coordinates (X, Y, Z) where:
-  - Affine coordinates: (X/Z², Y/Z³) over Fq2
+  Points are represented in projective coordinates (X, Y, Z) where:
+  - Affine coordinates: (X/Z, Y/Z) over Fq2
   - Point at infinity: (1, 1, 0)
   """
 
@@ -176,23 +176,23 @@ defmodule Tezex.Crypto.BLS.G2 do
   @doc """
   Checks if a point is the point at infinity.
   """
-  @spec is_zero?(t()) :: boolean()
-  def is_zero?(%{z: z}) do
-    Fq2.is_zero?(z)
+  @spec zero?(t()) :: boolean()
+  def zero?(%{z: z}) do
+    Fq2.zero?(z)
   end
 
   @doc """
-  Alias for is_zero?/1 for compatibility.
+  Alias for zero?/1 for compatibility.
   """
-  @spec is_infinity?(t()) :: boolean()
-  def is_infinity?(point), do: is_zero?(point)
+  @spec infinity?(t()) :: boolean()
+  def infinity?(point), do: zero?(point)
 
   @doc """
   Checks if a point is on the curve.
   """
   @spec is_on_curve?(t()) :: boolean()
   def is_on_curve?(point) do
-    if is_zero?(point) do
+    if zero?(point) do
       true
     else
       %{x: x, y: y, z: z} = point
@@ -219,7 +219,7 @@ defmodule Tezex.Crypto.BLS.G2 do
   """
   @spec double(t()) :: t()
   def double(point) do
-    if is_zero?(point) do
+    if zero?(point) do
       zero()
     else
       %{x: x, y: y, z: z} = point
@@ -264,16 +264,15 @@ defmodule Tezex.Crypto.BLS.G2 do
   @spec add(t(), t()) :: t()
   def add(p1, p2) do
     cond do
-      is_zero?(p1) -> p2
-      is_zero?(p2) -> p1
-      eq?(p1, p2) -> double(p1)
-      true -> add_different(p1, p2)
+      zero?(p1) -> p2
+      zero?(p2) -> p1
+      true -> add_nonzero(p1, p2)
     end
   end
 
-  # Helper for adding two different points
-  # Optimized addition algorithm
-  defp add_different(p1, p2) do
+  # Add two non-zero points. Handles the same-point and inverse cases inline
+  # so we don't pay for an upfront eq?/2 (which redoes the same V1/V2/U1/U2 muls).
+  defp add_nonzero(p1, p2) do
     %{x: x1, y: y1, z: z1} = p1
     %{x: x2, y: y2, z: z2} = p2
 
@@ -346,7 +345,7 @@ defmodule Tezex.Crypto.BLS.G2 do
   """
   @spec negate(t()) :: t()
   def negate(point) do
-    if is_zero?(point) do
+    if zero?(point) do
       zero()
     else
       new(point.x, Fq2.neg(point.y), point.z)
@@ -368,7 +367,7 @@ defmodule Tezex.Crypto.BLS.G2 do
   """
   @spec mul(t(), Fr.t()) :: t()
   def mul(point, scalar) when byte_size(scalar) == 32 do
-    if is_zero?(point) do
+    if zero?(point) do
       zero()
     else
       # Convert scalar to integer for bit operations
@@ -382,7 +381,7 @@ defmodule Tezex.Crypto.BLS.G2 do
   """
   @spec mul_integer(t(), non_neg_integer()) :: t()
   def mul_integer(point, scalar_int) when is_integer(scalar_int) do
-    if is_zero?(point) do
+    if zero?(point) do
       zero()
     else
       scalar_multiplication(point, scalar_int)
@@ -413,8 +412,8 @@ defmodule Tezex.Crypto.BLS.G2 do
   @spec eq?(t(), t()) :: boolean()
   def eq?(p1, p2) do
     cond do
-      is_zero?(p1) and is_zero?(p2) -> true
-      is_zero?(p1) or is_zero?(p2) -> false
+      zero?(p1) and zero?(p2) -> true
+      zero?(p1) or zero?(p2) -> false
       true -> eq_different?(p1, p2)
     end
   end
@@ -444,7 +443,7 @@ defmodule Tezex.Crypto.BLS.G2 do
   """
   @spec to_affine(t()) :: {:ok, {Fq2.t(), Fq2.t()}} | {:error, :point_at_infinity}
   def to_affine(point) do
-    if is_zero?(point) do
+    if zero?(point) do
       {:error, :point_at_infinity}
     else
       %{x: x, y: y, z: z} = point
@@ -484,7 +483,7 @@ defmodule Tezex.Crypto.BLS.G2 do
   """
   @spec to_compressed_bytes(t()) :: binary()
   def to_compressed_bytes(point) do
-    if is_zero?(point) do
+    if zero?(point) do
       @infinity
     else
       case to_affine(point) do
@@ -653,7 +652,7 @@ defmodule Tezex.Crypto.BLS.G2 do
 
     # Exceptional case: if denominator is zero
     denominator =
-      if Fq2.is_zero?(denominator) do
+      if Fq2.zero?(denominator) do
         Fq2.mul(@iso_3_z, @iso_3_a)
       else
         denominator
@@ -735,7 +734,7 @@ defmodule Tezex.Crypto.BLS.G2 do
         sqrt_candidate = Fq2.mul(root, gamma)
         temp = Fq2.sub(Fq2.mul(Fq2.square(sqrt_candidate), v), u)
 
-        if Fq2.is_zero?(temp) do
+        if Fq2.zero?(temp) do
           {:halt, {true, sqrt_candidate}}
         else
           {:cont, {false, gamma}}
@@ -748,7 +747,7 @@ defmodule Tezex.Crypto.BLS.G2 do
     Enum.any?(@etas, fn eta ->
       eta_sqrt_candidate = Fq2.mul(eta, sqrt_candidate)
       temp = Fq2.sub(Fq2.mul(Fq2.square(eta_sqrt_candidate), v), u)
-      Fq2.is_zero?(temp)
+      Fq2.zero?(temp)
     end)
   end
 
@@ -757,7 +756,7 @@ defmodule Tezex.Crypto.BLS.G2 do
       eta_sqrt_candidate = Fq2.mul(eta, sqrt_candidate)
       temp = Fq2.sub(Fq2.mul(Fq2.square(eta_sqrt_candidate), v), u)
 
-      if Fq2.is_zero?(temp) do
+      if Fq2.zero?(temp) do
         {:halt, eta_sqrt_candidate}
       else
         {:cont, nil}

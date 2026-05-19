@@ -24,19 +24,14 @@ defmodule Tezex.Crypto.BLS.Fr do
 
   @doc """
   Creates a field element from a binary (32 bytes, big-endian).
+  Rejects values outside `[0, @order)`.
   """
-  @spec from_bytes(binary()) :: {:ok, t()} | {:error, :invalid_size}
-  def from_bytes(bytes) when byte_size(bytes) == 32 do
-    <<value::big-unsigned-integer-size(256)>> = bytes
-
-    if value < @order do
-      {:ok, bytes}
-    else
-      # Reduce if needed
-      {:ok, from_integer(value)}
-    end
+  @spec from_bytes(binary()) :: {:ok, t()} | {:error, :invalid_size | :out_of_range}
+  def from_bytes(<<value::big-unsigned-integer-size(256)>> = bytes) when value < @order do
+    {:ok, bytes}
   end
 
+  def from_bytes(bytes) when byte_size(bytes) == 32, do: {:error, :out_of_range}
   def from_bytes(_), do: {:error, :invalid_size}
 
   @doc """
@@ -75,8 +70,8 @@ defmodule Tezex.Crypto.BLS.Fr do
   @doc """
   Checks if a field element is zero.
   """
-  @spec is_zero?(t()) :: boolean()
-  def is_zero?(fr) do
+  @spec zero?(t()) :: boolean()
+  def zero?(fr) do
     fr == zero()
   end
 end

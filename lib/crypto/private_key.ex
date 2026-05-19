@@ -128,7 +128,7 @@ defmodule Tezex.Crypto.PrivateKey do
   - edesk... (Ed25519 encrypted seed)
   - spsk... (Secp256k1 secret key)
   - spesk... (Secp256k1 encrypted secret key)
-  - p2sk... (P256 secret key) 
+  - p2sk... (P256 secret key)
   - p2esk... (P256 encrypted secret key)
   - BLsk... (BLS12-381 secret key)
   - BLesk... (BLS12-381 encrypted secret key)
@@ -171,10 +171,8 @@ defmodule Tezex.Crypto.PrivateKey do
   """
   @spec from_encoded_key!(String.t(), String.t() | nil) :: t()
   def from_encoded_key!(encoded_key, passphrase \\ nil) when is_binary(encoded_key) do
-    encoded_key_bytes = String.to_charlist(encoded_key) |> :erlang.list_to_binary()
-
     # Parse key format
-    curve_prefix = binary_part(encoded_key_bytes, 0, 2)
+    curve_prefix = binary_part(encoded_key, 0, 2)
 
     curve =
       case curve_prefix do
@@ -187,7 +185,7 @@ defmodule Tezex.Crypto.PrivateKey do
 
     # Check if encrypted
     encrypted? =
-      case binary_part(encoded_key_bytes, 2, 1) do
+      case binary_part(encoded_key, 2, 1) do
         "e" -> true
         _ -> false
       end
@@ -195,12 +193,12 @@ defmodule Tezex.Crypto.PrivateKey do
     # Check if this is a secret key
     key_type =
       if encrypted? do
-        binary_part(encoded_key_bytes, 3, 2)
+        binary_part(encoded_key, 3, 2)
       else
-        binary_part(encoded_key_bytes, 2, 2)
+        binary_part(encoded_key, 2, 2)
       end
 
-    unless key_type == "sk" do
+    if key_type != "sk" do
       raise "not_secret_key"
     end
 
@@ -218,54 +216,50 @@ defmodule Tezex.Crypto.PrivateKey do
         end
       end
 
-    unless byte_size(encoded_key_bytes) in [expected_length, 98] do
+    if byte_size(encoded_key) not in [expected_length, 98] do
       raise "invalid_key_length"
     end
 
-    # Decode from base58 and strip prefix
-    decoded_key =
+    # Decode from base58. decode58! raises FunctionClauseError on malformed
+    # base58; we translate only that to "invalid_base58". Other RuntimeErrors
+    # raised below ("invalid_length", "invalid_checksum",
+    # "unsupported_key_format") must propagate so callers see the real cause.
+    decoded_with_prefix_and_checksum =
       try do
-        # Use decode58! which includes checksum, then validate and remove it
-        decoded_with_prefix_and_checksum = Base58Check.decode58!(encoded_key_bytes)
-
-        # Find the prefix and expected data length from the encoding table
-        prefix_info = find_encoding_info(encoded_key)
-        prefix_len = byte_size(prefix_info.d_prefix)
-        expected_data_len = prefix_info.d_len
-
-        # Validate total length (prefix + data + 4-byte checksum)
-        expected_total_len = prefix_len + expected_data_len + 4
-
-        if byte_size(decoded_with_prefix_and_checksum) != expected_total_len do
-          raise "invalid_length"
-        end
-
-        # Extract prefix + data (without checksum)
-        prefix_and_data =
-          binary_part(decoded_with_prefix_and_checksum, 0, prefix_len + expected_data_len)
-
-        checksum =
-          binary_part(decoded_with_prefix_and_checksum, prefix_len + expected_data_len, 4)
-
-        # Validate checksum
-        computed_checksum =
-          :crypto.hash(:sha256, :crypto.hash(:sha256, prefix_and_data))
-          |> binary_part(0, 4)
-
-        if checksum != computed_checksum do
-          raise "invalid_checksum"
-        end
-
-        # Strip the prefix to get just the key data
-        binary_part(prefix_and_data, prefix_len, expected_data_len)
+        Base58Check.decode58!(encoded_key)
       rescue
-        _ -> raise "invalid_base58"
+        FunctionClauseError -> raise "invalid_base58"
       end
+
+    prefix_info = find_encoding_info(encoded_key)
+    prefix_len = byte_size(prefix_info.d_prefix)
+    expected_data_len = prefix_info.d_len
+    expected_total_len = prefix_len + expected_data_len + 4
+
+    if byte_size(decoded_with_prefix_and_checksum) != expected_total_len do
+      raise "invalid_length"
+    end
+
+    prefix_and_data =
+      binary_part(decoded_with_prefix_and_checksum, 0, prefix_len + expected_data_len)
+
+    checksum =
+      binary_part(decoded_with_prefix_and_checksum, prefix_len + expected_data_len, 4)
+
+    computed_checksum =
+      :crypto.hash(:sha256, :crypto.hash(:sha256, prefix_and_data))
+      |> binary_part(0, 4)
+
+    if checksum != computed_checksum do
+      raise "invalid_checksum"
+    end
+
+    decoded_key = binary_part(prefix_and_data, prefix_len, expected_data_len)
 
     # Extract secret key bytes
     secret_key_bytes =
       if encrypted? do
-        unless passphrase do
+        if is_nil(passphrase) do
           raise "passphrase_required"
         end
 

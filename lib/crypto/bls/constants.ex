@@ -10,17 +10,18 @@ defmodule Tezex.Crypto.BLS.Constants do
   # Curve order (number of points on the curve)
   @curve_order 52_435_875_175_126_190_479_447_740_508_185_965_837_690_552_500_527_637_822_603_658_699_938_581_184_513
 
-  # Pseudo-binary encoding of the ATE loop count for efficient Miller loop
-  # This is the binary representation (LSB first) for the Miller algorithm
-  # Binary: 1101001000000001000000000000000000000000000000010000000000000000
-  # Reversed for Miller loop (LSB first):
-  @pseudo_binary_encoding for char <-
-                                String.graphemes(
-                                  "0000000000000000100000000000000000000000000000001000000001001011"
-                                ),
-                              do: String.to_integer(char)
+  # Pseudo-binary encoding of the ATE loop count for the BLS12-381 Miller loop.
+  # Source string is LSB-first (64 bits); the Miller loop iterates bits 62..0,
+  # so we precompute that iteration order once at compile time.
+  @miller_loop_bits "0000000000000000100000000000000000000000000000001000000001001011"
+                    |> String.graphemes()
+                    |> Enum.map(&String.to_integer/1)
+                    |> Enum.slice(0..62)
+                    |> Enum.reverse()
+
+  63 = length(@miller_loop_bits)
 
   def field_modulus, do: @field_modulus
   def curve_order, do: @curve_order
-  def pseudo_binary_encoding, do: @pseudo_binary_encoding
+  def miller_loop_bits, do: @miller_loop_bits
 end
