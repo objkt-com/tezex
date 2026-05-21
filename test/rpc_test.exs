@@ -191,22 +191,23 @@ defmodule Tezex.RpcTest do
     ]
 
     assert {:error,
-            [
-              [
-                %{
-                  "amount" => "1000000000",
-                  "balance" => _,
-                  "contract" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
-                  "id" => error_a,
-                  "kind" => "temporary"
-                },
-                %{
-                  "amounts" => [_, "1000000000"],
-                  "id" => error_b,
-                  "kind" => "temporary"
-                }
-              ]
-            ]} =
+            {:preapply_failed,
+             [
+               [
+                 %{
+                   "amount" => "1000000000",
+                   "balance" => _,
+                   "contract" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
+                   "id" => error_a,
+                   "kind" => "temporary"
+                 },
+                 %{
+                   "amounts" => [_, "1000000000"],
+                   "id" => error_b,
+                   "kind" => "temporary"
+                 }
+               ]
+             ]}} =
              Rpc.send_operation(rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)
 
     assert String.ends_with?(error_a, "balance_too_low"), error_a

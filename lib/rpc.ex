@@ -218,7 +218,7 @@ defmodule Tezex.Rpc do
   Sign the forged operation and returns the forged operation+signature payload to be injected.
   """
   @spec forge_and_sign_operation(operation(), encoded_private_key()) ::
-          {:ok, nonempty_binary()} | {:error, nonempty_binary()}
+          {:ok, nonempty_binary()} | {:error, ForgeOperation.error_reason()}
   def forge_and_sign_operation(operation, encoded_private_key) do
     with {:ok, forged_operation} <- ForgeOperation.operation_group(operation) do
       signature = Crypto.sign_operation(encoded_private_key, forged_operation)
@@ -237,10 +237,7 @@ defmodule Tezex.Rpc do
   Simulate the application of the operations with the context of the given block and return the result of each operation application.
   """
   @spec preapply_operation(t(), map(), encoded_private_key(), any()) ::
-          {:ok, any()}
-          | {:error, Finch.Error.t()}
-          | {:error, Jason.DecodeError.t()}
-          | {:error, term()}
+          {:ok, list()} | {:error, error_reason()}
   def preapply_operation(%Rpc{} = rpc, operation, encoded_private_key, protocol) do
     with {:ok, forged_operation} <- ForgeOperation.operation_group(operation),
          signature = Crypto.sign_operation(encoded_private_key, forged_operation),
@@ -285,11 +282,11 @@ defmodule Tezex.Rpc do
               errors
             end
 
-          {:error, errors}
+          {:error, {:preapply_failed, errors}}
         end
 
-      {:ok, _result} ->
-        {:error, :preapply_failed}
+      {:ok, result} ->
+        {:error, {:unexpected_response, result}}
 
       err ->
         err
