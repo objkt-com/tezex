@@ -24,7 +24,7 @@ defmodule Tezex.Fee do
   @spec calculate_fee(map(), pos_integer(),
           extra_size: pos_integer(),
           minimal_nanotez_per_gas_unit: pos_integer()
-        ) :: {:ok, pos_integer()} | {:error, nonempty_binary()}
+        ) :: {:ok, pos_integer()} | {:error, ForgeOperation.error_reason()}
   def calculate_fee(content, consumed_gas, opts \\ []) do
     extra_size = Keyword.get(opts, :extra_size, @extra_size)
 
