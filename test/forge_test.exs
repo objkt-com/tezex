@@ -193,7 +193,7 @@ defmodule Tezex.ForgeTest do
       "signature" => nil
     }
 
-    assert {:error, "Operation content is missing required keys: parameters.entrypoint"} =
+    assert {:error, {:missing_keys, ["parameters.entrypoint"]}} =
              ForgeOperation.operation_group(opg)
   end
 

@@ -145,7 +145,7 @@ defmodule Tezex.ForgeOperationTest do
       }
 
       assert ForgeOperation.operation(Map.drop(origination, ["storage_limit"])) ==
-               {:error, "Operation content is missing required keys: storage_limit"}
+               {:error, {:missing_keys, ["storage_limit"]}}
 
       {:ok, result} = ForgeOperation.operation(origination)
 
@@ -272,7 +272,10 @@ defmodule Tezex.ForgeOperationTest do
     assert ForgeOperation.validate_required_keys(%{"a" => 1, "b" => 2}, ~w(a b)) == :ok
 
     assert ForgeOperation.validate_required_keys(%{"a" => 1, "b" => 2}, ~w(a b c)) ==
-             {:error, "Operation content is missing required keys: c"}
+             {:error, {:missing_keys, ["c"]}}
+
+    assert ForgeOperation.validate_required_keys(%{"a" => 1}, ~w(a b c)) ==
+             {:error, {:missing_keys, ["b", "c"]}}
 
     assert ForgeOperation.validate_required_keys(
              %{"a" => %{"b" => 2, "c" => %{"d" => 3}}},
@@ -282,6 +285,9 @@ defmodule Tezex.ForgeOperationTest do
     assert ForgeOperation.validate_required_keys(
              %{"a" => %{"b" => 2, "c" => %{}}},
              ~w(a a.b a.c a.c.d)
-           ) == {:error, "Operation content is missing required keys: a.c.d"}
+           ) == {:error, {:missing_keys, ["a.c.d"]}}
+
+    assert ForgeOperation.validate_required_keys(%{"a" => %{}}, ~w(a a.b a.c)) ==
+             {:error, {:missing_keys, ["a.b", "a.c"]}}
   end
 end

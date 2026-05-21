@@ -8,6 +8,8 @@ defmodule Tezex.ForgeOperation do
 
   alias Tezex.Forge
 
+  @type error_reason() :: {:missing_keys, [String.t()]}
+
   @operation_tags %{
     "endorsement" => 0,
     "endorsement_with_slot" => 10,
@@ -57,7 +59,7 @@ defmodule Tezex.ForgeOperation do
     <<Map.fetch!(@operation_tags, kind)::size(8)>>
   end
 
-  @spec operation(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
+  @spec operation(map()) :: {:ok, nonempty_binary()} | {:error, error_reason()}
   def operation(content) do
     case content["kind"] do
       "failing_noop" -> failing_noop(content)
@@ -77,7 +79,7 @@ defmodule Tezex.ForgeOperation do
   end
 
   @keys ~w(branch contents)
-  @spec operation_group(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
+  @spec operation_group(map()) :: {:ok, nonempty_binary()} | {:error, error_reason()}
   def operation_group(operation_group) do
     with :ok <- validate_required_keys(operation_group, @keys),
          operations = Enum.map(operation_group["contents"], &operation/1),
@@ -97,7 +99,7 @@ defmodule Tezex.ForgeOperation do
   end
 
   @keys ~w(kind pkh secret)
-  @spec activate_account(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
+  @spec activate_account(map()) :: {:ok, nonempty_binary()} | {:error, error_reason()}
   def activate_account(content) do
     with :ok <- validate_required_keys(content, @keys) do
       content =
@@ -113,7 +115,7 @@ defmodule Tezex.ForgeOperation do
   end
 
   @keys ~w(kind source fee counter gas_limit storage_limit public_key)
-  @spec reveal(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
+  @spec reveal(map()) :: {:ok, nonempty_binary()} | {:error, error_reason()}
   def reveal(content) do
     with :ok <- validate_required_keys(content, @keys) do
       content =
@@ -141,7 +143,7 @@ defmodule Tezex.ForgeOperation do
 
   @keys ~w(kind source fee counter gas_limit storage_limit amount destination)
   @params ~w(parameters parameters.entrypoint parameters.value)
-  @spec transaction(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
+  @spec transaction(map()) :: {:ok, nonempty_binary()} | {:error, error_reason()}
   def transaction(content) do
     with :ok <- validate_required_keys(content, @keys),
          :ok <-
@@ -178,7 +180,7 @@ defmodule Tezex.ForgeOperation do
   end
 
   @keys ~w(kind source fee counter gas_limit storage_limit balance)
-  @spec origination(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
+  @spec origination(map()) :: {:ok, nonempty_binary()} | {:error, error_reason()}
   def origination(content) do
     with :ok <- validate_required_keys(content, @keys) do
       content =
@@ -206,7 +208,7 @@ defmodule Tezex.ForgeOperation do
   end
 
   @keys ~w(kind source fee counter gas_limit storage_limit)
-  @spec delegation(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
+  @spec delegation(map()) :: {:ok, nonempty_binary()} | {:error, error_reason()}
   def delegation(content) do
     with :ok <- validate_required_keys(content, @keys) do
       content =
@@ -232,7 +234,7 @@ defmodule Tezex.ForgeOperation do
   end
 
   @keys ~w(kind level)
-  @spec endorsement(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
+  @spec endorsement(map()) :: {:ok, nonempty_binary()} | {:error, error_reason()}
   def endorsement(content) do
     with :ok <- validate_required_keys(content, @keys) do
       content =
@@ -247,7 +249,7 @@ defmodule Tezex.ForgeOperation do
   end
 
   @keys ~w(branch operations operations.kind operations.level signature)
-  @spec inline_endorsement(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
+  @spec inline_endorsement(map()) :: {:ok, nonempty_binary()} | {:error, error_reason()}
   def inline_endorsement(content) do
     with :ok <- validate_required_keys(content, @keys) do
       content =
@@ -264,7 +266,7 @@ defmodule Tezex.ForgeOperation do
   end
 
   @keys ~w(kind endorsement slot)
-  @spec endorsement_with_slot(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
+  @spec endorsement_with_slot(map()) :: {:ok, nonempty_binary()} | {:error, error_reason()}
   def endorsement_with_slot(content) do
     with :ok <- validate_required_keys(content, @keys),
          {:ok, endorsement} <- inline_endorsement(content["endorsement"]) do
@@ -281,7 +283,7 @@ defmodule Tezex.ForgeOperation do
   end
 
   @keys ~w(kind arbitrary)
-  @spec failing_noop(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
+  @spec failing_noop(map()) :: {:ok, nonempty_binary()} | {:error, error_reason()}
   def failing_noop(content) do
     with :ok <- validate_required_keys(content, @keys) do
       content =
@@ -296,7 +298,7 @@ defmodule Tezex.ForgeOperation do
   end
 
   @keys ~w(kind source fee counter gas_limit storage_limit value)
-  @spec register_global_constant(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
+  @spec register_global_constant(map()) :: {:ok, nonempty_binary()} | {:error, error_reason()}
   def register_global_constant(content) do
     with :ok <- validate_required_keys(content, @keys) do
       content =
@@ -316,7 +318,7 @@ defmodule Tezex.ForgeOperation do
   end
 
   @keys ~w(kind source fee counter gas_limit storage_limit ticket_contents ticket_ty ticket_ticketer ticket_amount destination entrypoint)
-  @spec transfer_ticket(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
+  @spec transfer_ticket(map()) :: {:ok, nonempty_binary()} | {:error, error_reason()}
   def transfer_ticket(content) do
     with :ok <- validate_required_keys(content, @keys) do
       content =
@@ -341,7 +343,7 @@ defmodule Tezex.ForgeOperation do
   end
 
   @keys ~w(kind source fee counter gas_limit storage_limit message)
-  @spec smart_rollup_add_messages(map()) :: {:ok, nonempty_binary()} | {:error, nonempty_binary()}
+  @spec smart_rollup_add_messages(map()) :: {:ok, nonempty_binary()} | {:error, error_reason()}
   def smart_rollup_add_messages(content) do
     with :ok <- validate_required_keys(content, @keys) do
       content =
@@ -367,7 +369,7 @@ defmodule Tezex.ForgeOperation do
 
   @keys ~w(kind source fee counter gas_limit storage_limit rollup cemented_commitment output_proof)
   @spec smart_rollup_execute_outbox_message(map()) ::
-          {:ok, nonempty_binary()} | {:error, nonempty_binary()}
+          {:ok, nonempty_binary()} | {:error, error_reason()}
   def smart_rollup_execute_outbox_message(content) do
     with :ok <- validate_required_keys(content, @keys) do
       content =
@@ -388,7 +390,7 @@ defmodule Tezex.ForgeOperation do
     end
   end
 
-  @spec validate_required_keys(map(), list()) :: :ok | {:error, nonempty_binary()}
+  @spec validate_required_keys(map(), list()) :: :ok | {:error, error_reason()}
   def validate_required_keys(map, required_keys, acc \\ "")
       when is_map(map) and is_list(required_keys) do
     required_keys = Enum.group_by(required_keys, &String.contains?(&1, "."))
@@ -421,8 +423,7 @@ defmodule Tezex.ForgeOperation do
         end)
       end
     else
-      {:error,
-       "Operation content is missing required keys: #{acc}#{Enum.join(missing_keys, ", ")}"}
+      {:error, {:missing_keys, Enum.map(missing_keys, &(acc <> &1))}}
     end
   end
 end
