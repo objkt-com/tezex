@@ -11,11 +11,11 @@ defmodule Tezex.RpcTest do
 
   @tag :tezos
   test "get_counter_for_account" do
-    counter =
-      Rpc.get_counter_for_account(
-        %Rpc{endpoint: @endpoint},
-        "tz1LKpeN8ZSSFNyTWiBNaE4u4sjaq7J1Vz2z"
-      )
+    assert {:ok, counter} =
+             Rpc.get_counter_for_account(
+               %Rpc{endpoint: @endpoint},
+               "tz1LKpeN8ZSSFNyTWiBNaE4u4sjaq7J1Vz2z"
+             )
 
     assert is_integer(counter)
   end

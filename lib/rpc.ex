@@ -294,24 +294,21 @@ defmodule Tezex.Rpc do
   end
 
   @spec get_counter_for_account(t(), nonempty_binary()) ::
-          integer() | {:error, :not_integer} | {:error, Finch.Error.t()}
+          {:ok, integer()} | {:error, error_reason()}
   def get_counter_for_account(%Rpc{} = rpc, address) do
-    with {:ok, n} <- get(rpc, "/blocks/head/context/contracts/#{address}/counter"),
-         {n, ""} <- Integer.parse(n) do
-      n
-    else
-      {:error, _} = err -> err
-      :error -> {:error, :not_integer}
-      {_, rest} when is_binary(rest) -> {:error, :not_integer}
+    with {:ok, n} <- get(rpc, "/blocks/head/context/contracts/#{address}/counter") do
+      case Integer.parse(n) do
+        {parsed, ""} -> {:ok, parsed}
+        _ -> {:error, {:invalid_counter, n}}
+      end
     end
   end
 
   @spec get_next_counter_for_account(t(), nonempty_binary()) ::
-          {:ok, integer()} | {:error, :not_integer} | {:error, Finch.Error.t()}
+          {:ok, integer()} | {:error, error_reason()}
   def get_next_counter_for_account(%Rpc{} = rpc, address) do
-    case get_counter_for_account(rpc, address) do
-      {:error, _} = err -> err
-      n -> {:ok, n + 1}
+    with {:ok, n} <- get_counter_for_account(rpc, address) do
+      {:ok, n + 1}
     end
   end
 
