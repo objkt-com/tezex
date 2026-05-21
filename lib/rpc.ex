@@ -21,6 +21,19 @@ defmodule Tezex.Rpc do
   @type operation() :: map()
   @type preapplied_operations() :: map()
 
+  @type transport_error() ::
+          {:transport, Exception.t()}
+          | {:http_status, Finch.Response.t()}
+          | {:decode, Jason.DecodeError.t()}
+
+  @type error_reason() ::
+          transport_error()
+          | {:missing_keys, [String.t()]}
+          | {:preapply_failed, list()}
+          | {:unexpected_response, term()}
+          | {:invalid_counter, term()}
+          | {:invalid_balance, term()}
+
   defstruct [:endpoint, chain_id: "main", headers: [], opts: []]
 
   @spec prepare_operation(
@@ -305,44 +318,40 @@ defmodule Tezex.Rpc do
     end
   end
 
-  @spec get_block(t()) ::
-          {:ok, map()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
-  @spec get_block(t(), nonempty_binary()) ::
-          {:ok, map()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
+  @spec get_block(t()) :: {:ok, map()} | {:error, transport_error()}
+  @spec get_block(t(), nonempty_binary()) :: {:ok, map()} | {:error, transport_error()}
   def get_block(%Rpc{} = rpc, hash \\ "head") do
     get(rpc, "/blocks/#{hash}")
   end
 
-  @spec get_block_at_offset(t(), integer()) ::
-          {:ok, map()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
+  @spec get_block_at_offset(t(), integer()) :: {:ok, map()} | {:error, transport_error()}
   def get_block_at_offset(%Rpc{} = rpc, offset) do
     if offset <= 0 do
       get_block(rpc)
+    else
+      with {:ok, head} <- get_block(rpc) do
+        get(rpc, "/blocks/#{head["header"]["level"] - offset}")
+      end
     end
-
-    {:ok, head} = get_block(rpc)
-    get(rpc, "/blocks/#{head["header"]["level"] - offset}")
   end
 
-  @spec inject_operation(t(), any()) ::
-          {:ok, any()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
+  @spec inject_operation(t(), any()) :: {:ok, any()} | {:error, transport_error()}
   def inject_operation(%Rpc{} = rpc, payload) do
     post(rpc, "/injection/operation", payload)
   end
 
-  @spec get_balance(t(), nonempty_binary()) ::
-          {:ok, pos_integer()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
+  @spec get_balance(t(), nonempty_binary()) :: {:ok, pos_integer()} | {:error, error_reason()}
   def get_balance(%Rpc{} = rpc, address) do
     with {:ok, balance} <- get(rpc, "/blocks/head/context/contracts/#{address}/balance") do
-      {:ok, String.to_integer(balance)}
+      case Integer.parse(balance) do
+        {parsed, ""} -> {:ok, parsed}
+        _ -> {:error, {:invalid_balance, balance}}
+      end
     end
   end
 
   @spec get(Tezex.Rpc.t(), nonempty_binary()) ::
-          {:ok, any()}
-          | {:error, Finch.Error.t()}
-          | {:error, Finch.Response.t()}
-          | {:error, Jason.DecodeError.t()}
+          {:ok, any()} | {:error, transport_error()}
   defp get(%Rpc{} = rpc, path) do
     url =
       URI.parse(rpc.endpoint)
@@ -353,17 +362,22 @@ defmodule Tezex.Rpc do
     Finch.build(:get, url, rpc.headers)
     |> Finch.request(Tezex.Finch, rpc.opts)
     |> case do
-      {:ok, %Finch.Response{status: 200, body: body}} -> Jason.decode(body)
-      {:ok, resp} -> {:error, resp}
-      {:error, _} = err -> err
+      {:ok, %Finch.Response{status: 200, body: body}} ->
+        case Jason.decode(body) do
+          {:ok, _} = ok -> ok
+          {:error, e} -> {:error, {:decode, e}}
+        end
+
+      {:ok, resp} ->
+        {:error, {:http_status, resp}}
+
+      {:error, e} ->
+        {:error, {:transport, e}}
     end
   end
 
   @spec post(Tezex.Rpc.t(), nonempty_binary(), any()) ::
-          {:ok, any()}
-          | {:error, Finch.Error.t()}
-          | {:error, Finch.Response.t()}
-          | {:error, Jason.DecodeError.t()}
+          {:ok, any()} | {:error, transport_error()}
   defp post(%Rpc{} = rpc, path, body) do
     url =
       URI.parse(rpc.endpoint)
@@ -385,9 +399,17 @@ defmodule Tezex.Rpc do
     Finch.build(:post, url, rpc.headers, body)
     |> Finch.request(Tezex.Finch, rpc.opts)
     |> case do
-      {:ok, %Finch.Response{status: 200, body: body}} -> Jason.decode(body)
-      {:ok, resp} -> {:error, resp}
-      {:error, _} = err -> err
+      {:ok, %Finch.Response{status: 200, body: body}} ->
+        case Jason.decode(body) do
+          {:ok, _} = ok -> ok
+          {:error, e} -> {:error, {:decode, e}}
+        end
+
+      {:ok, resp} ->
+        {:error, {:http_status, resp}}
+
+      {:error, e} ->
+        {:error, {:transport, e}}
     end
   end
 

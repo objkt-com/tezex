@@ -78,6 +78,11 @@ defmodule Tezex.RpcTest do
     assert {:ok, result} == Rpc.forge_and_sign_operation(operation, @ghostnet_1_pkey)
   end
 
+  test "forge_and_sign_operation/2 propagates a missing-keys error" do
+    assert {:error, {:missing_keys, ["branch"]}} =
+             Rpc.forge_and_sign_operation(%{"contents" => []}, @ghostnet_1_pkey)
+  end
+
   describe "fill_operation_fee/3" do
     test "a contract operation" do
       operation_result = Tezex.OperationResultFixture.offer()
