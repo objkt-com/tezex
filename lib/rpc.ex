@@ -76,7 +76,7 @@ defmodule Tezex.Rpc do
           storage_limit: non_neg_integer(),
           gas_reserve: non_neg_integer(),
           burn_reserve: non_neg_integer()
-        ) :: operation()
+        ) :: {:ok, operation()} | {:error, ForgeOperation.error_reason()}
   def fill_operation_fee(operation, preapplied_operations, opts \\ []) do
     gas_limit = Keyword.get(opts, :gas_limit)
     storage_limit = Keyword.get(opts, :storage_limit)
@@ -166,7 +166,7 @@ defmodule Tezex.Rpc do
     first_error = Enum.find(contents, &(elem(&1, 0) == :error))
 
     if is_nil(first_error) do
-      %{operation | "contents" => Enum.map(contents, &elem(&1, 1))}
+      {:ok, %{operation | "contents" => Enum.map(contents, &elem(&1, 1))}}
     else
       first_error
     end
@@ -196,7 +196,7 @@ defmodule Tezex.Rpc do
           offset: non_neg_integer(),
           storage_limit: non_neg_integer()
         ) ::
-          {:ok, any()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
+          {:ok, any()} | {:error, error_reason()}
   def send_operation(%Rpc{} = rpc, transactions, wallet_address, encoded_private_key, opts \\ []) do
     transactions = if is_map(transactions), do: [transactions], else: transactions
     offset = Keyword.get(opts, :offset, 0)
@@ -208,7 +208,7 @@ defmodule Tezex.Rpc do
          operation = prepare_operation(transactions, wallet_address, counter, branch),
          {:ok, preapplied_operations} <-
            preapply_operation(rpc, operation, encoded_private_key, protocol),
-         operation = fill_operation_fee(operation, preapplied_operations, opts),
+         {:ok, operation} <- fill_operation_fee(operation, preapplied_operations, opts),
          {:ok, payload} <- forge_and_sign_operation(operation, encoded_private_key) do
       inject_operation(rpc, payload)
     end

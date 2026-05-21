@@ -87,20 +87,21 @@ defmodule Tezex.RpcTest do
     test "a contract operation" do
       operation_result = Tezex.OperationResultFixture.offer()
 
-      assert %{
-               "contents" => [
-                 %{
-                   "amount" => "1000000",
-                   "counter" => "26949360",
-                   "destination" => "KT1MFWsAXGUZ4gFkQnjByWjrrVtuQi4Tya8G",
-                   "fee" => "651",
-                   "gas_limit" => "2419",
-                   "kind" => "transaction",
-                   "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
-                   "storage_limit" => "289"
-                 }
-               ]
-             } =
+      assert {:ok,
+              %{
+                "contents" => [
+                  %{
+                    "amount" => "1000000",
+                    "counter" => "26949360",
+                    "destination" => "KT1MFWsAXGUZ4gFkQnjByWjrrVtuQi4Tya8G",
+                    "fee" => "651",
+                    "gas_limit" => "2419",
+                    "kind" => "transaction",
+                    "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
+                    "storage_limit" => "289"
+                  }
+                ]
+              }} =
                Rpc.fill_operation_fee(
                  %{
                    "contents" => []
@@ -112,16 +113,17 @@ defmodule Tezex.RpcTest do
     test "a transfer" do
       operation_result = Tezex.OperationResultFixture.transfer()
 
-      assert %{
-               "contents" => [
-                 %{
-                   "amount" => "100",
-                   "fee" => "285",
-                   "gas_limit" => "269",
-                   "storage_limit" => "100"
-                 }
-               ]
-             } =
+      assert {:ok,
+              %{
+                "contents" => [
+                  %{
+                    "amount" => "100",
+                    "fee" => "285",
+                    "gas_limit" => "269",
+                    "storage_limit" => "100"
+                  }
+                ]
+              }} =
                Rpc.fill_operation_fee(
                  %{
                    "contents" => []
@@ -133,15 +135,24 @@ defmodule Tezex.RpcTest do
     test "a settle_auction" do
       operation_result = Tezex.OperationResultFixture.settle_auction()
 
-      assert %{
-               "contents" => [
-                 %{
-                   "fee" => "2372",
-                   "gas_limit" => "20847",
-                   "storage_limit" => "103"
-                 }
-               ]
-             } = Rpc.fill_operation_fee(%{"contents" => []}, operation_result)
+      assert {:ok,
+              %{
+                "contents" => [
+                  %{
+                    "fee" => "2372",
+                    "gas_limit" => "20847",
+                    "storage_limit" => "103"
+                  }
+                ]
+              }} = Rpc.fill_operation_fee(%{"contents" => []}, operation_result)
+    end
+
+    test "propagates a missing-keys error" do
+      [content] = Tezex.OperationResultFixture.transfer()
+      invalid = [Map.delete(content, "amount")]
+
+      assert {:error, {:missing_keys, ["amount"]}} =
+               Rpc.fill_operation_fee(%{"contents" => []}, invalid)
     end
   end
 
