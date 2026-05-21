@@ -140,7 +140,7 @@ defmodule Tezex.Rpc do
             if content["kind"] in ~w(origination transaction) do
               {gas_limit_new + gas_reserve, storage_limit_new + burn_reserve}
             else
-              gas_limit_new
+              {gas_limit_new, storage_limit_new}
             end
 
           extra_size = 1 + div(Fee.extra_size(), number_contents)

@@ -154,6 +154,31 @@ defmodule Tezex.RpcTest do
       assert {:error, {:missing_keys, ["amount"]}} =
                Rpc.fill_operation_fee(%{"contents" => []}, invalid)
     end
+
+    test "handles a non-origination/transaction operation kind" do
+      preapplied = [
+        %{
+          "kind" => "delegation",
+          "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
+          "fee" => "0",
+          "counter" => "1",
+          "gas_limit" => "1000",
+          "storage_limit" => "0",
+          "delegate" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
+          "metadata" => %{
+            "operation_result" => %{
+              "consumed_milligas" => "1000000",
+              "status" => "applied"
+            }
+          }
+        }
+      ]
+
+      assert {:ok, %{"contents" => [%{"kind" => "delegation", "fee" => fee}]}} =
+               Rpc.fill_operation_fee(%{"contents" => []}, preapplied)
+
+      assert is_binary(fee)
+    end
   end
 
   describe "send_operation/4" do
