@@ -1,6 +1,6 @@
 # Changelog for Tezex
 
-## vNext
+## v5.0.0
 
 - [BREAKING][forge_operation]: error returns changed from `{:error, String.t()}` to `{:error, {:missing_keys, [String.t()]}}` (affects `validate_required_keys/3`, `operation/1`, `operation_group/1` and all per-operation builders)
 - [BREAKING][fee]: `calculate_fee/3` error shape changed accordingly (propagated from `forge_operation`)
