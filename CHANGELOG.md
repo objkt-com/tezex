@@ -2,6 +2,9 @@
 
 ## vNext
 
+- [BREAKING][forge_operation]: error returns changed from `{:error, String.t()}` to `{:error, {:missing_keys, [String.t()]}}` (affects `validate_required_keys/3`, `operation/1`, `operation_group/1` and all per-operation builders)
+- [BREAKING][fee]: `calculate_fee/3` error shape changed accordingly (propagated from `forge_operation`)
+- [BREAKING][rpc]: unified all error returns to `{:error, {reason, detail}}` — transport errors are wrapped (`:transport`, `:http_status`, `:decode`); preapply returns `{:preapply_failed, errors}` / `{:unexpected_response, body}`; `fill_operation_fee/3` now returns `{:ok, operation} | {:error, _}` (previously crashed on fee errors); `get_counter_for_account/2` now returns `{:ok, integer()} | {:error, _}`; `get_balance/2` returns `{:error, {:invalid_balance, _}}` instead of raising on a non-integer body; `get_block_at_offset/2` returns `{:error, _}` instead of raising on a transport error, and now short-circuits to the head block for `offset <= 0`
 - [BREAKING][crypto/bls]: drop `is_` prefix from predicates (`is_zero?` → `zero?`, `is_one?` → `one?`, `is_infinity?` → `infinity?`) across `Fq`, `Fr`, `Fq2`, `Fq12`, `FqP`, `G1`, `G2`
 - [BREAKING][crypto/bls]: `Fq12.inv/1` and `FqP.inv/1` now return `{:ok, t} | {:error, :not_invertible}`
 - [BREAKING][crypto/bls]: `Fr.from_bytes/1` rejects out-of-range scalars with `:out_of_range` instead of silently reducing

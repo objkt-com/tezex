@@ -21,6 +21,19 @@ defmodule Tezex.Rpc do
   @type operation() :: map()
   @type preapplied_operations() :: map()
 
+  @type transport_error() ::
+          {:transport, Exception.t()}
+          | {:http_status, Finch.Response.t()}
+          | {:decode, Jason.DecodeError.t()}
+
+  @type error_reason() ::
+          transport_error()
+          | {:missing_keys, [String.t()]}
+          | {:preapply_failed, list()}
+          | {:unexpected_response, term()}
+          | {:invalid_counter, term()}
+          | {:invalid_balance, term()}
+
   defstruct [:endpoint, chain_id: "main", headers: [], opts: []]
 
   @spec prepare_operation(
@@ -63,7 +76,7 @@ defmodule Tezex.Rpc do
           storage_limit: non_neg_integer(),
           gas_reserve: non_neg_integer(),
           burn_reserve: non_neg_integer()
-        ) :: operation()
+        ) :: {:ok, operation()} | {:error, ForgeOperation.error_reason()}
   def fill_operation_fee(operation, preapplied_operations, opts \\ []) do
     gas_limit = Keyword.get(opts, :gas_limit)
     storage_limit = Keyword.get(opts, :storage_limit)
@@ -127,7 +140,7 @@ defmodule Tezex.Rpc do
             if content["kind"] in ~w(origination transaction) do
               {gas_limit_new + gas_reserve, storage_limit_new + burn_reserve}
             else
-              gas_limit_new
+              {gas_limit_new, storage_limit_new}
             end
 
           extra_size = 1 + div(Fee.extra_size(), number_contents)
@@ -153,7 +166,7 @@ defmodule Tezex.Rpc do
     first_error = Enum.find(contents, &(elem(&1, 0) == :error))
 
     if is_nil(first_error) do
-      %{operation | "contents" => Enum.map(contents, &elem(&1, 1))}
+      {:ok, %{operation | "contents" => Enum.map(contents, &elem(&1, 1))}}
     else
       first_error
     end
@@ -183,7 +196,7 @@ defmodule Tezex.Rpc do
           offset: non_neg_integer(),
           storage_limit: non_neg_integer()
         ) ::
-          {:ok, any()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
+          {:ok, any()} | {:error, error_reason()}
   def send_operation(%Rpc{} = rpc, transactions, wallet_address, encoded_private_key, opts \\ []) do
     transactions = if is_map(transactions), do: [transactions], else: transactions
     offset = Keyword.get(opts, :offset, 0)
@@ -195,7 +208,7 @@ defmodule Tezex.Rpc do
          operation = prepare_operation(transactions, wallet_address, counter, branch),
          {:ok, preapplied_operations} <-
            preapply_operation(rpc, operation, encoded_private_key, protocol),
-         operation = fill_operation_fee(operation, preapplied_operations, opts),
+         {:ok, operation} <- fill_operation_fee(operation, preapplied_operations, opts),
          {:ok, payload} <- forge_and_sign_operation(operation, encoded_private_key) do
       inject_operation(rpc, payload)
     end
@@ -205,7 +218,7 @@ defmodule Tezex.Rpc do
   Sign the forged operation and returns the forged operation+signature payload to be injected.
   """
   @spec forge_and_sign_operation(operation(), encoded_private_key()) ::
-          {:ok, nonempty_binary()} | {:error, nonempty_binary()}
+          {:ok, nonempty_binary()} | {:error, ForgeOperation.error_reason()}
   def forge_and_sign_operation(operation, encoded_private_key) do
     with {:ok, forged_operation} <- ForgeOperation.operation_group(operation) do
       signature = Crypto.sign_operation(encoded_private_key, forged_operation)
@@ -224,10 +237,7 @@ defmodule Tezex.Rpc do
   Simulate the application of the operations with the context of the given block and return the result of each operation application.
   """
   @spec preapply_operation(t(), map(), encoded_private_key(), any()) ::
-          {:ok, any()}
-          | {:error, Finch.Error.t()}
-          | {:error, Jason.DecodeError.t()}
-          | {:error, term()}
+          {:ok, list()} | {:error, error_reason()}
   def preapply_operation(%Rpc{} = rpc, operation, encoded_private_key, protocol) do
     with {:ok, forged_operation} <- ForgeOperation.operation_group(operation),
          signature = Crypto.sign_operation(encoded_private_key, forged_operation),
@@ -272,11 +282,11 @@ defmodule Tezex.Rpc do
               errors
             end
 
-          {:error, errors}
+          {:error, {:preapply_failed, errors}}
         end
 
-      {:ok, _result} ->
-        {:error, :preapply_failed}
+      {:ok, result} ->
+        {:error, {:unexpected_response, result}}
 
       err ->
         err
@@ -284,65 +294,58 @@ defmodule Tezex.Rpc do
   end
 
   @spec get_counter_for_account(t(), nonempty_binary()) ::
-          integer() | {:error, :not_integer} | {:error, Finch.Error.t()}
+          {:ok, integer()} | {:error, error_reason()}
   def get_counter_for_account(%Rpc{} = rpc, address) do
-    with {:ok, n} <- get(rpc, "/blocks/head/context/contracts/#{address}/counter"),
-         {n, ""} <- Integer.parse(n) do
-      n
-    else
-      {:error, _} = err -> err
-      :error -> {:error, :not_integer}
-      {_, rest} when is_binary(rest) -> {:error, :not_integer}
+    with {:ok, n} <- get(rpc, "/blocks/head/context/contracts/#{address}/counter") do
+      case Integer.parse(n) do
+        {parsed, ""} -> {:ok, parsed}
+        _ -> {:error, {:invalid_counter, n}}
+      end
     end
   end
 
   @spec get_next_counter_for_account(t(), nonempty_binary()) ::
-          {:ok, integer()} | {:error, :not_integer} | {:error, Finch.Error.t()}
+          {:ok, integer()} | {:error, error_reason()}
   def get_next_counter_for_account(%Rpc{} = rpc, address) do
-    case get_counter_for_account(rpc, address) do
-      {:error, _} = err -> err
-      n -> {:ok, n + 1}
+    with {:ok, n} <- get_counter_for_account(rpc, address) do
+      {:ok, n + 1}
     end
   end
 
-  @spec get_block(t()) ::
-          {:ok, map()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
-  @spec get_block(t(), nonempty_binary()) ::
-          {:ok, map()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
+  @spec get_block(t()) :: {:ok, map()} | {:error, transport_error()}
+  @spec get_block(t(), nonempty_binary()) :: {:ok, map()} | {:error, transport_error()}
   def get_block(%Rpc{} = rpc, hash \\ "head") do
     get(rpc, "/blocks/#{hash}")
   end
 
-  @spec get_block_at_offset(t(), integer()) ::
-          {:ok, map()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
+  @spec get_block_at_offset(t(), integer()) :: {:ok, map()} | {:error, transport_error()}
   def get_block_at_offset(%Rpc{} = rpc, offset) do
     if offset <= 0 do
       get_block(rpc)
+    else
+      with {:ok, head} <- get_block(rpc) do
+        get(rpc, "/blocks/#{head["header"]["level"] - offset}")
+      end
     end
-
-    {:ok, head} = get_block(rpc)
-    get(rpc, "/blocks/#{head["header"]["level"] - offset}")
   end
 
-  @spec inject_operation(t(), any()) ::
-          {:ok, any()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
+  @spec inject_operation(t(), any()) :: {:ok, any()} | {:error, transport_error()}
   def inject_operation(%Rpc{} = rpc, payload) do
     post(rpc, "/injection/operation", payload)
   end
 
-  @spec get_balance(t(), nonempty_binary()) ::
-          {:ok, pos_integer()} | {:error, Finch.Error.t()} | {:error, Jason.DecodeError.t()}
+  @spec get_balance(t(), nonempty_binary()) :: {:ok, pos_integer()} | {:error, error_reason()}
   def get_balance(%Rpc{} = rpc, address) do
     with {:ok, balance} <- get(rpc, "/blocks/head/context/contracts/#{address}/balance") do
-      {:ok, String.to_integer(balance)}
+      case Integer.parse(balance) do
+        {parsed, ""} -> {:ok, parsed}
+        _ -> {:error, {:invalid_balance, balance}}
+      end
     end
   end
 
   @spec get(Tezex.Rpc.t(), nonempty_binary()) ::
-          {:ok, any()}
-          | {:error, Finch.Error.t()}
-          | {:error, Finch.Response.t()}
-          | {:error, Jason.DecodeError.t()}
+          {:ok, any()} | {:error, transport_error()}
   defp get(%Rpc{} = rpc, path) do
     url =
       URI.parse(rpc.endpoint)
@@ -353,17 +356,22 @@ defmodule Tezex.Rpc do
     Finch.build(:get, url, rpc.headers)
     |> Finch.request(Tezex.Finch, rpc.opts)
     |> case do
-      {:ok, %Finch.Response{status: 200, body: body}} -> Jason.decode(body)
-      {:ok, resp} -> {:error, resp}
-      {:error, _} = err -> err
+      {:ok, %Finch.Response{status: 200, body: body}} ->
+        case Jason.decode(body) do
+          {:ok, _} = ok -> ok
+          {:error, e} -> {:error, {:decode, e}}
+        end
+
+      {:ok, resp} ->
+        {:error, {:http_status, resp}}
+
+      {:error, e} ->
+        {:error, {:transport, e}}
     end
   end
 
   @spec post(Tezex.Rpc.t(), nonempty_binary(), any()) ::
-          {:ok, any()}
-          | {:error, Finch.Error.t()}
-          | {:error, Finch.Response.t()}
-          | {:error, Jason.DecodeError.t()}
+          {:ok, any()} | {:error, transport_error()}
   defp post(%Rpc{} = rpc, path, body) do
     url =
       URI.parse(rpc.endpoint)
@@ -385,9 +393,17 @@ defmodule Tezex.Rpc do
     Finch.build(:post, url, rpc.headers, body)
     |> Finch.request(Tezex.Finch, rpc.opts)
     |> case do
-      {:ok, %Finch.Response{status: 200, body: body}} -> Jason.decode(body)
-      {:ok, resp} -> {:error, resp}
-      {:error, _} = err -> err
+      {:ok, %Finch.Response{status: 200, body: body}} ->
+        case Jason.decode(body) do
+          {:ok, _} = ok -> ok
+          {:error, e} -> {:error, {:decode, e}}
+        end
+
+      {:ok, resp} ->
+        {:error, {:http_status, resp}}
+
+      {:error, e} ->
+        {:error, {:transport, e}}
     end
   end
 
