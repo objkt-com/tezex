@@ -124,7 +124,7 @@ defmodule Tezex.Zarith do
 
     bits_count = length(segments)
 
-    <<integer::integer-size(bits_count)>> = Enum.into(segments, <<>>, fn bit -> <<bit::1>> end)
+    <<integer::integer-size(^bits_count)>> = Enum.into(segments, <<>>, fn bit -> <<bit::1>> end)
 
     dec_to_hex(integer)
   end
@@ -211,7 +211,7 @@ defmodule Tezex.Zarith do
 
     bits = for p <- parts, into: <<>>, do: p
     bits_count = bit_size(bits)
-    <<integer::integer-size(bits_count)>> = bits
+    <<integer::integer-size(^bits_count)>> = bits
 
     case sign do
       1 -> %{int: "-#{integer}"}
