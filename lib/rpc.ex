@@ -259,30 +259,7 @@ defmodule Tezex.Rpc do
         if applied? do
           {:ok, preapplied_operations}
         else
-          errors =
-            Enum.flat_map(
-              preapplied_operations,
-              fn
-                %{
-                  "metadata" => %{
-                    "internal_operation_results" => internal_operation_results
-                  }
-                } ->
-                  Enum.flat_map(internal_operation_results, & &1["result"]["errors"])
-
-                _ ->
-                  []
-              end
-            )
-
-          errors =
-            if Enum.empty?(errors) do
-              Enum.map(preapplied_operations, & &1["metadata"]["operation_result"]["errors"])
-            else
-              errors
-            end
-
-          {:error, {:preapply_failed, errors}}
+          {:error, {:preapply_failed, preapply_errors(preapplied_operations)}}
         end
 
       {:ok, result} ->
@@ -291,6 +268,28 @@ defmodule Tezex.Rpc do
       err ->
         err
     end
+  end
+
+  # Collect the errors reported by a failed preapply. Internal operation errors
+  # take precedence: when an operation is backtracked, its own `operation_result`
+  # carries no errors and only the internal results explain the failure.
+  @doc false
+  @spec preapply_errors(list(preapplied_operations())) :: list()
+  def preapply_errors(preapplied_operations) do
+    case internal_operation_errors(preapplied_operations) do
+      [] -> Enum.map(preapplied_operations, & &1["metadata"]["operation_result"]["errors"])
+      errors -> errors
+    end
+  end
+
+  defp internal_operation_errors(preapplied_operations) do
+    Enum.flat_map(preapplied_operations, fn
+      %{"metadata" => %{"internal_operation_results" => internal_operation_results}} ->
+        Enum.flat_map(internal_operation_results, &List.wrap(&1["result"]["errors"]))
+
+      _ ->
+        []
+    end)
   end
 
   @spec get_counter_for_account(t(), nonempty_binary()) ::

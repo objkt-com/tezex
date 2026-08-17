@@ -181,6 +181,68 @@ defmodule Tezex.RpcTest do
     end
   end
 
+  describe "preapply_errors/1" do
+    test "collects internal operation errors when some results carry none" do
+      error = %{"id" => "proto.023.michelson_v1.script_rejected", "kind" => "temporary"}
+
+      preapplied_operations = [
+        %{
+          "kind" => "transaction",
+          "metadata" => %{
+            "operation_result" => %{"status" => "backtracked"},
+            "internal_operation_results" => [
+              %{"result" => %{"status" => "applied"}},
+              %{"result" => %{"status" => "failed", "errors" => [error]}}
+            ]
+          }
+        }
+      ]
+
+      assert [^error] = Rpc.preapply_errors(preapplied_operations)
+    end
+
+    test "collects internal operation errors across several operations" do
+      error_a = %{"id" => "proto.023.michelson_v1.script_rejected", "kind" => "temporary"}
+      error_b = %{"id" => "proto.023.contract.balance_too_low", "kind" => "temporary"}
+
+      preapplied_operations = [
+        %{
+          "kind" => "transaction",
+          "metadata" => %{
+            "operation_result" => %{"status" => "backtracked"},
+            "internal_operation_results" => [
+              %{"result" => %{"status" => "failed", "errors" => [error_a]}}
+            ]
+          }
+        },
+        %{
+          "kind" => "transaction",
+          "metadata" => %{
+            "operation_result" => %{"status" => "backtracked"},
+            "internal_operation_results" => [
+              %{"result" => %{"status" => "failed", "errors" => [error_b]}}
+            ]
+          }
+        }
+      ]
+
+      assert [^error_a, ^error_b] = Rpc.preapply_errors(preapplied_operations)
+    end
+
+    test "falls back to the operation result errors" do
+      error = %{"id" => "proto.023.contract.balance_too_low", "kind" => "temporary"}
+
+      preapplied_operations = [
+        %{
+          "kind" => "transaction",
+          "metadata" => %{"operation_result" => %{"status" => "failed", "errors" => [error]}}
+        }
+      ]
+
+      assert [[^error]] = Rpc.preapply_errors(preapplied_operations)
+    end
+  end
+
   describe "send_operation/4" do
     @describetag :tezos
 
