@@ -9,6 +9,10 @@
 - [crypto]: add `Base58Check.decode_check/1`
 - [forge]: `forge_public_key/2` raises on a key with a bad checksum
 - [forge]: `forge_public_key/2`, `unforge_public_key/2` and `forge_base58/2` handle tz4 (`BLpk`) public keys; `forge_public_key/2` used to raise on them, which also broke forging a tz4 reveal
+- [rpc]: add `entrypoints/2` and `entrypoint/3`, cached in ETS
+- [rpc]: `entrypoint/3` returns `{:error, {:no_such_entrypoint, name}}` when the entrypoint doesn't exist
+- [rpc]: `entrypoints/2` and `entrypoint/3` return `{:error, {:invalid_address, address}}` for an invalid address
+- [rpc]: `entrypoint/3` returns `{:error, {:invalid_entrypoint, name}}` for an invalid name
 
 ## v5.0.0
 

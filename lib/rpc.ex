@@ -6,8 +6,10 @@ defmodule Tezex.Rpc do
   """
 
   alias Tezex.Crypto
+  alias Tezex.Crypto.Base58Check
   alias Tezex.ForgeOperation
   alias Tezex.Rpc
+  alias Tezex.Rpc.EntrypointCache
   alias Tezex.Fee
 
   @type t() :: %__MODULE__{
@@ -33,6 +35,18 @@ defmodule Tezex.Rpc do
           | {:unexpected_response, term()}
           | {:invalid_counter, term()}
           | {:invalid_balance, term()}
+          | {:no_such_entrypoint, binary()}
+          | {:invalid_address, binary()}
+          | {:invalid_entrypoint, binary()}
+
+  # KT1, tz1, tz2, tz3, tz4
+  @address_prefixes [
+    <<2, 90, 121>>,
+    <<6, 161, 159>>,
+    <<6, 161, 161>>,
+    <<6, 161, 164>>,
+    <<6, 161, 166>>
+  ]
 
   defstruct [:endpoint, chain_id: "main", headers: [], opts: []]
 
@@ -342,6 +356,87 @@ defmodule Tezex.Rpc do
       end
     end
   end
+
+  @doc """
+  Return the entrypoints of contract `address`, as the node sends them:
+  `%{"entrypoints" => %{name => type}, "unreachable" => [...]}`, where each
+  type is a Micheline expression. The node leaves out `"unreachable"` when it
+  is empty, and lists `"default"` only if the contract annotates a branch
+  `%default`.
+
+  Returns `{:error, {:invalid_address, address}}` when `address` isn't a
+  KT1, tz1, tz2, tz3 or tz4 address with a valid checksum.
+
+  Successful results are cached, see `Tezex.Rpc.EntrypointCache`.
+  """
+  @spec entrypoints(t(), nonempty_binary()) ::
+          {:ok, map()} | {:error, transport_error() | {:invalid_address, binary()}}
+  def entrypoints(%Rpc{} = rpc, address) do
+    with :ok <- check_address(address) do
+      EntrypointCache.fetch({rpc.endpoint, rpc.chain_id, address}, fn ->
+        get(rpc, "/blocks/head/context/contracts/#{address}/entrypoints")
+      end)
+    end
+  end
+
+  @doc """
+  Return the parameter type of entrypoint `name` of contract `address`, as a
+  Micheline expression.
+
+  For `"default"` on a contract that has no `%default` annotation, the node
+  returns the whole parameter type, so this also gives the type of a call
+  without an entrypoint.
+
+  The node answers 404 when the name is unknown, when `address` is an
+  implicit account and when the contract doesn't exist. All three return
+  `{:error, {:no_such_entrypoint, name}}`.
+
+  Returns `{:error, {:invalid_address, address}}` when `address` isn't a
+  KT1, tz1, tz2, tz3 or tz4 address with a valid checksum, and
+  `{:error, {:invalid_entrypoint, name}}` when `name` isn't 1 to 31 bytes long
+  or is `"."` or `".."`.
+
+  Successful results are cached, see `Tezex.Rpc.EntrypointCache`.
+  """
+  @spec entrypoint(t(), nonempty_binary(), nonempty_binary()) ::
+          {:ok, map()}
+          | {:error,
+             transport_error()
+             | {:no_such_entrypoint, binary()}
+             | {:invalid_address, binary()}
+             | {:invalid_entrypoint, binary()}}
+  def entrypoint(%Rpc{} = rpc, address, name) do
+    with :ok <- check_address(address),
+         :ok <- check_entrypoint(name) do
+      EntrypointCache.fetch({rpc.endpoint, rpc.chain_id, address, name}, fn ->
+        encoded_name = URI.encode(name, &URI.char_unreserved?/1)
+
+        case get(rpc, "/blocks/head/context/contracts/#{address}/entrypoints/#{encoded_name}") do
+          {:error, {:http_status, %Finch.Response{status: 404}}} ->
+            {:error, {:no_such_entrypoint, name}}
+
+          result ->
+            result
+        end
+      end)
+    end
+  end
+
+  defp check_address(address) do
+    case Base58Check.decode_check(address) do
+      {:ok, <<prefix::binary-size(3), _hash::binary-size(20)>>}
+      when prefix in @address_prefixes ->
+        :ok
+
+      _ ->
+        {:error, {:invalid_address, address}}
+    end
+  end
+
+  # An entrypoint name is 1 to 31 bytes. "." and ".." would change the URL's path.
+  defp check_entrypoint(name) when name in [".", ".."], do: {:error, {:invalid_entrypoint, name}}
+  defp check_entrypoint(name) when byte_size(name) in 1..31, do: :ok
+  defp check_entrypoint(name), do: {:error, {:invalid_entrypoint, name}}
 
   @spec get(Tezex.Rpc.t(), nonempty_binary()) ::
           {:ok, any()} | {:error, transport_error()}
