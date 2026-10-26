@@ -3,6 +3,9 @@
 ## Unreleased
 
 - [forge]: `forge_public_key/2`, `unforge_public_key/2` and `forge_base58/2` handle tz4 (`BLpk`) public keys; `forge_public_key/2` used to raise on them, which also broke forging a tz4 reveal
+- [rpc]: add `entrypoints/2`, which returns a contract's entrypoints and their types
+- [rpc]: add `entrypoint/3`, which returns the parameter type of one entrypoint (the whole parameter type for `default` on a contract without `%default`), or `{:error, {:no_such_entrypoint, name}}` when the node answers 404
+- [rpc]: cache successful `entrypoints/2` and `entrypoint/3` results in ETS per endpoint, chain and contract (`Tezex.Rpc.EntrypointCache`, started by the application)
 
 ## v5.0.0
 
