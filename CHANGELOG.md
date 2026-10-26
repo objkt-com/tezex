@@ -2,10 +2,11 @@
 
 ## Unreleased
 
-- [forge]: `forge_public_key/2`, `unforge_public_key/2` and `forge_base58/2` handle tz4 (`BLpk`) public keys; `forge_public_key/2` used to raise on them, which also broke forging a tz4 reveal
+- [forge]: `forge_public_key/2`, `unforge_public_key/2` and `forge_base58/2` handle tz4 (`BLpk`) public keys
 - [rpc]: add `entrypoints/2`, which returns a contract's entrypoints and their types
 - [rpc]: add `entrypoint/3`, which returns the parameter type of one entrypoint (the whole parameter type for `default` on a contract without `%default`), or `{:error, {:no_such_entrypoint, name}}` when the node answers 404
 - [rpc]: cache successful `entrypoints/2` and `entrypoint/3` results in ETS per endpoint, chain and contract (`Tezex.Rpc.EntrypointCache`, started by the application)
+- [michelson]: add `Tezex.Michelson`: `encode/2` and `encode!/2` build a contract call's Micheline parameter from an Elixir term and the entrypoint's type, for every passable Michelson type, with map and set elements sorted in the protocol's order; `schema/1` shows the term a type expects
 
 ## v5.0.0
 
