@@ -1,5 +1,9 @@
 # Changelog for Tezex
 
+## Unreleased
+
+- [forge]: `forge_public_key/2`, `unforge_public_key/2` and `forge_base58/2` handle tz4 (`BLpk`) public keys; `forge_public_key/2` used to raise on them, which also broke forging a tz4 reveal
+
 ## v5.0.0
 
 - [BREAKING][forge_operation]: error returns changed from `{:error, String.t()}` to `{:error, {:missing_keys, [String.t()]}}` (affects `validate_required_keys/3`, `operation/1`, `operation_group/1` and all per-operation builders)
