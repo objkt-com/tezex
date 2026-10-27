@@ -7,6 +7,7 @@ defmodule Tezex.Michelson.Base58 do
   and zk_rollup_repr.ml (epx1) in the protocol.
   """
 
+  alias Tezex.Crypto
   alias Tezex.Crypto.Base58Check
 
   @spec decode(String.t(), String.t()) :: {:ok, term()} | :error
@@ -27,7 +28,7 @@ defmodule Tezex.Michelson.Base58 do
   @spec address(String.t()) :: {:ok, {binary(), String.t()}} | :error
   def address(value) do
     with {:ok, address, entrypoint} <- split_entrypoint(value),
-         {:ok, payload} <- payload(address),
+         {:ok, payload} <- Base58Check.decode_check(address),
          {:ok, destination} <- destination(payload) do
       {:ok, {destination, entrypoint}}
     end
@@ -35,7 +36,7 @@ defmodule Tezex.Michelson.Base58 do
 
   @spec key_hash(String.t()) :: {:ok, binary()} | :error
   def key_hash(value) do
-    with {:ok, payload} <- payload(value) do
+    with {:ok, payload} <- Base58Check.decode_check(value) do
       implicit(payload)
     end
   end
@@ -47,21 +48,11 @@ defmodule Tezex.Michelson.Base58 do
   """
   @spec key(String.t()) :: {:ok, {0..3, binary()}} | :error
   def key(value) do
-    case payload(value) do
-      {:ok, <<13, 15, 37, 217, key::binary-size(32)>>} ->
-        {:ok, {0, key}}
-
-      {:ok, <<3, 254, 226, 86, parity, x::binary-size(32)>>} when parity in [2, 3] ->
-        {:ok, {1, <<parity, x::binary>>}}
-
-      {:ok, <<3, 178, 139, 127, parity, x::binary-size(32)>>} when parity in [2, 3] ->
-        {:ok, {2, <<parity, x::binary>>}}
-
-      {:ok, <<6, 149, 135, 204, key::binary-size(48)>>} ->
-        {:ok, {3, key}}
-
-      _ ->
-        :error
+    with {:ok, curve} <- curve(value),
+         {:ok, key} <- Crypto.extract_pubkey(value) do
+      {:ok, {curve, key}}
+    else
+      _ -> :error
     end
   end
 
@@ -71,19 +62,15 @@ defmodule Tezex.Michelson.Base58 do
   """
   @spec signature(String.t()) :: {:ok, binary()} | :error
   def signature(value) do
-    case payload(value) do
-      {:ok, <<9, 245, 205, 134, 18, signature::binary-size(64)>>} -> {:ok, signature}
-      {:ok, <<13, 115, 101, 19, 63, signature::binary-size(64)>>} -> {:ok, signature}
-      {:ok, <<54, 240, 44, 52, signature::binary-size(64)>>} -> {:ok, signature}
-      {:ok, <<4, 130, 43, signature::binary-size(64)>>} -> {:ok, signature}
-      {:ok, <<40, 171, 64, 207, signature::binary-size(96)>>} -> {:ok, signature}
-      _ -> :error
+    case Crypto.decode_signature(value) do
+      {:ok, signature} -> {:ok, signature}
+      {:error, :invalid_signature} -> :error
     end
   end
 
   @spec chain_id(String.t()) :: {:ok, binary()} | :error
   def chain_id(value) do
-    case payload(value) do
+    case Base58Check.decode_check(value) do
       {:ok, <<87, 82, 0, chain_id::binary-size(4)>>} -> {:ok, chain_id}
       _ -> :error
     end
@@ -125,21 +112,11 @@ defmodule Tezex.Michelson.Base58 do
   defp implicit(<<6, 161, 166, hash::binary-size(20)>>), do: {:ok, <<3, hash::binary>>}
   defp implicit(_payload), do: :error
 
-  # `Base58Check.decode58/1` leaves the 4 checksum bytes on and doesn't check them.
-  defp payload(value) do
-    case Base58Check.decode58(value) do
-      {:ok, raw} when byte_size(raw) > 4 -> verify_checksum(raw)
-      _ -> :error
-    end
-  end
-
-  defp verify_checksum(raw) do
-    size = byte_size(raw) - 4
-    <<payload::binary-size(^size), checksum::binary-size(4)>> = raw
-
-    case :crypto.hash(:sha256, :crypto.hash(:sha256, payload)) do
-      <<^checksum::binary-size(4), _::binary>> -> {:ok, payload}
-      _ -> :error
-    end
-  end
+  # The curve tag of a public key, from its prefix. `Crypto.extract_pubkey/1`
+  # checks the decoded prefix matches.
+  defp curve("edpk" <> _), do: {:ok, 0}
+  defp curve("sppk" <> _), do: {:ok, 1}
+  defp curve("p2pk" <> _), do: {:ok, 2}
+  defp curve("BLpk" <> _), do: {:ok, 3}
+  defp curve(_value), do: :error
 end
