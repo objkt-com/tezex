@@ -129,6 +129,7 @@ defmodule Tezex.Michelson do
       `{:contract, parameter}`, `{:ticket, schema}`
     * `{:map, key, value}`, `{:big_map, key, value}`, `{:lambda, arg, return}`
     * `{:unsupported, prim}`: a type tezex doesn't know
+    * `{:unsupported, type}`: a malformed type, one that isn't a node map
   """
   @type schema() :: atom() | String.t() | tuple() | %{String.t() => schema()}
 
@@ -160,6 +161,16 @@ defmodule Tezex.Michelson do
     "chest_key" => :chest_key,
     "sapling_transaction" => :sapling_transaction,
     "sapling_state" => :sapling_state
+  }
+  @container_schemas %{
+    "option" => :option,
+    "list" => :list,
+    "set" => :set,
+    "contract" => :contract,
+    "ticket" => :ticket,
+    "map" => :map,
+    "big_map" => :big_map,
+    "lambda" => :lambda
   }
 
   @doc """
@@ -205,11 +216,11 @@ defmodule Tezex.Michelson do
 
   def schema(%{"prim" => prim, "args" => [inner]})
       when prim in ~w(option list set contract ticket) do
-    {String.to_existing_atom(prim), schema(inner)}
+    {Map.fetch!(@container_schemas, prim), schema(inner)}
   end
 
   def schema(%{"prim" => prim, "args" => [left, right]}) when prim in ~w(map big_map lambda) do
-    {String.to_existing_atom(prim), schema(left), schema(right)}
+    {Map.fetch!(@container_schemas, prim), schema(left), schema(right)}
   end
 
   def schema(%{"prim" => prim}) do
@@ -217,6 +228,10 @@ defmodule Tezex.Michelson do
       {:ok, schema} -> schema
       :error -> {:unsupported, prim}
     end
+  end
+
+  def schema(type) do
+    {:unsupported, type}
   end
 
   @doc false
@@ -294,17 +309,21 @@ defmodule Tezex.Michelson do
     some(inner, value, path)
   end
 
-  defp do_encode(%{"prim" => "list", "args" => [inner]}, value, path) when is_list(value) do
-    value
-    |> Enum.with_index()
-    |> map_while_ok(fn {item, index} -> do_encode(inner, item, [index | path]) end)
+  defp do_encode(%{"prim" => "list", "args" => [inner]} = type, value, path)
+       when is_list(value) do
+    with :ok <- check_proper(type, value, path) do
+      value
+      |> Enum.with_index()
+      |> map_while_ok(fn {item, index} -> do_encode(inner, item, [index | path]) end)
+    end
   end
 
-  defp do_encode(%{"prim" => "set", "args" => [inner]}, value, path)
+  defp do_encode(%{"prim" => "set", "args" => [inner]} = type, value, path)
        when is_list(value) or is_struct(value, MapSet) do
     items = Enum.to_list(value)
 
-    with :ok <- check_comparable(inner, value, path),
+    with :ok <- check_proper(type, value, path),
+         :ok <- check_comparable(inner, value, path),
          {:ok, encoded} <- map_while_ok(items, &do_encode(inner, &1, [{:key, &1} | path])) do
       encoded
       |> Enum.zip_with(items, fn element, item -> {element, element, item} end)
@@ -379,6 +398,18 @@ defmodule Tezex.Michelson do
          {:ok, encoded_value} <- do_encode(value_type, value, [{:value, key} | path]) do
       {:ok, {encoded_key, %{"prim" => "Elt", "args" => [encoded_key, encoded_value]}, key}}
     end
+  end
+
+  defp check_proper(type, value, path) when is_list(value) do
+    if List.improper?(value) do
+      invalid(type, value, path)
+    else
+      :ok
+    end
+  end
+
+  defp check_proper(_type, %MapSet{}, _path) do
+    :ok
   end
 
   defp check_comparable(type, value, path) do
@@ -716,7 +747,7 @@ defmodule Tezex.Michelson do
     end
   end
 
-  defp own_field_name(%{"annots" => annots}) do
+  defp own_field_name(%{"annots" => annots}) when is_list(annots) do
     Enum.find_value(annots, fn
       "%" <> name when name != "" -> name
       _annot -> nil
