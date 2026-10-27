@@ -3,6 +3,7 @@ defmodule Tezex.CryptoTest do
   doctest Tezex.Crypto, import: true
 
   alias Tezex.Crypto
+  alias Tezex.Crypto.Base58Check
   alias Tezex.Micheline
 
   describe "check_signature/4" do
@@ -158,12 +159,13 @@ defmodule Tezex.CryptoTest do
         end
       end
 
-      # modify one character in the valid signature to make it invalid
+      # modify one character in the valid signature to make it invalid: its
+      # base58check checksum no longer matches
       for params <- @msg_sig_pubkey do
         try do
           sig = replace_nth_character(params["signature"])
 
-          assert {:error, :bad_signature} =
+          assert {:error, :invalid_signature} =
                    Crypto.check_signature(
                      params["address"],
                      sig,
@@ -211,6 +213,36 @@ defmodule Tezex.CryptoTest do
             flunk(params["test_name"] <> ": sig check should have failed")
         end
       end
+    end
+  end
+
+  describe "extract_pubkey/1 and decode_signature/1" do
+    @edpk "edpktsPhZ8weLEXqf4Fo5FS9Qx8ZuX4QpEBEwe63L747G8iDjTAF6w"
+    @sppk "sppk7aBerAEA6tv4wzg6FnK7i5YrGtEGFVvNjWhc2QX8bhzpouBVFSW"
+    @spsig "spsig1ZNQaUKNERZSiEiNviqa5EAPkcNASXhfkXtxRatZTDZAnUB4Ra2Jus8b1oEpFnPx8Z6g28pd8vK3R8nPK29JDU5FiSLH5T"
+
+    test "reject a bad checksum" do
+      assert {:error, :invalid_pubkey_format} = Crypto.extract_pubkey(corrupt_checksum(@edpk))
+      assert {:error, :invalid_signature} = Crypto.decode_signature(corrupt_checksum(@spsig))
+    end
+
+    test "reject bytes after the key or signature" do
+      {:ok, <<prefix::binary-size(4), key::binary>>} = Base58Check.decode_check(@edpk)
+
+      assert {:error, :invalid_pubkey_format} =
+               Crypto.extract_pubkey(Base58Check.encode(key <> <<0>>, prefix))
+
+      {:ok, <<prefix::binary-size(5), sig::binary>>} = Base58Check.decode_check(@spsig)
+
+      assert {:error, :invalid_signature} =
+               Crypto.decode_signature(Base58Check.encode(sig <> <<0>>, prefix))
+    end
+
+    test "reject a compressed point that doesn't start with 02 or 03" do
+      {:ok, <<prefix::binary-size(4), _parity, x::binary>>} = Base58Check.decode_check(@sppk)
+
+      assert {:error, :invalid_pubkey_format} =
+               Crypto.extract_pubkey(Base58Check.encode(<<4>> <> x, prefix))
     end
   end
 
@@ -439,5 +471,13 @@ defmodule Tezex.CryptoTest do
       end
 
     String.replace(input, re, "\\g{1}#{replacement}\\g{3}")
+  end
+
+  # Same prefix and payload, last checksum byte flipped.
+  defp corrupt_checksum(encoded) do
+    raw = Base58Check.decode58!(encoded)
+    size = byte_size(raw) - 1
+    <<rest::binary-size(^size), last>> = raw
+    Elixir.Base58Check.encode58(rest <> <<Bitwise.bxor(last, 1)>>)
   end
 end

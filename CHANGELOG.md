@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [crypto]: `extract_pubkey/1` and `decode_signature/1` verify the base58check checksum and reject trailing bytes, and `extract_pubkey/1` rejects a secp256k1 or p256 key that doesn't start with 02 or 03; a signature with a corrupted checksum now gives `check_signature/4` `{:error, :invalid_signature}` instead of `{:error, :bad_signature}`
+- [crypto]: add `Base58Check.decode_check/1`, which decodes a base58check string and verifies its checksum
 - [forge]: `forge_public_key/2`, `unforge_public_key/2` and `forge_base58/2` handle tz4 (`BLpk`) public keys
 - [rpc]: add `entrypoints/2`, which returns a contract's entrypoints and their types
 - [rpc]: add `entrypoint/3`, which returns the parameter type of one entrypoint (the whole parameter type for `default` on a contract without `%default`), or `{:error, {:no_such_entrypoint, name}}` when the node answers 404

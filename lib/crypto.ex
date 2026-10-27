@@ -92,11 +92,14 @@ defmodule Tezex.Crypto do
   end
 
   def extract_pubkey(pubkey) do
-    case Base58Check.decode58(pubkey) do
-      {:ok, <<@prefix_edpk, public_key::binary-size(32)>> <> _} -> {:ok, public_key}
-      {:ok, <<@prefix_sppk, public_key::binary-size(33)>> <> _} -> {:ok, public_key}
-      {:ok, <<@prefix_p2pk, public_key::binary-size(33)>> <> _} -> {:ok, public_key}
-      {:ok, <<@prefix_blpk, public_key::binary-size(48)>> <> _} -> {:ok, public_key}
+    case Base58Check.decode_check(pubkey) do
+      {:ok, <<@prefix_edpk, public_key::binary-size(32)>>} -> {:ok, public_key}
+      # secp256k1 and p256 keys are compressed points: 02 or 03, then x.
+      {:ok, <<@prefix_sppk, 2, x::binary-size(32)>>} -> {:ok, <<2, x::binary>>}
+      {:ok, <<@prefix_sppk, 3, x::binary-size(32)>>} -> {:ok, <<3, x::binary>>}
+      {:ok, <<@prefix_p2pk, 2, x::binary-size(32)>>} -> {:ok, <<2, x::binary>>}
+      {:ok, <<@prefix_p2pk, 3, x::binary-size(32)>>} -> {:ok, <<3, x::binary>>}
+      {:ok, <<@prefix_blpk, public_key::binary-size(48)>>} -> {:ok, public_key}
       _ -> {:error, :invalid_pubkey_format}
     end
   end
@@ -429,41 +432,38 @@ defmodule Tezex.Crypto do
 
   @spec decode_signature(binary()) :: {:error, :invalid_signature} | {:ok, binary()}
   def decode_signature("edsig" <> _ = sig) do
-    case Base58Check.decode58(sig) do
-      {:ok, <<@prefix_edsig, sig::binary-size(64)>> <> _} -> {:ok, sig}
+    case Base58Check.decode_check(sig) do
+      {:ok, <<@prefix_edsig, sig::binary-size(64)>>} -> {:ok, sig}
       _ -> {:error, :invalid_signature}
     end
   end
 
   def decode_signature("spsig" <> _ = sig) do
-    case Base58Check.decode58(sig) do
-      {:ok, <<@prefix_spsig, sig::binary-size(64)>> <> _} -> {:ok, sig}
+    case Base58Check.decode_check(sig) do
+      {:ok, <<@prefix_spsig, sig::binary-size(64)>>} -> {:ok, sig}
       _ -> {:error, :invalid_signature}
     end
   end
 
   def decode_signature("p2sig" <> _ = sig) do
-    case Base58Check.decode58(sig) do
-      {:ok, <<@prefix_p2sig, sig::binary-size(64)>> <> _} -> {:ok, sig}
+    case Base58Check.decode_check(sig) do
+      {:ok, <<@prefix_p2sig, sig::binary-size(64)>>} -> {:ok, sig}
       _ -> {:error, :invalid_signature}
     end
   end
 
   def decode_signature("sig" <> _ = sig) do
-    case Base58Check.decode58(sig) do
-      {:ok, <<@prefix_sig, sig::binary-size(64)>> <> _} -> {:ok, sig}
+    case Base58Check.decode_check(sig) do
+      {:ok, <<@prefix_sig, sig::binary-size(64)>>} -> {:ok, sig}
       _ -> {:error, :invalid_signature}
     end
   end
 
   def decode_signature("BLsig" <> _ = sig) do
-    case Base58Check.decode58(sig) do
-      # BLS signatures are: 4-byte prefix + 96-byte signature + 4-byte checksum = 104 bytes total
-      {:ok, <<@prefix_blsig, sig_data::binary-size(96), _checksum::binary-size(4)>>} ->
-        {:ok, sig_data}
-
-      # Fallback for different encoding formats
-      {:ok, <<@prefix_blsig, sig_data::binary-size(96)>> <> _} ->
+    case Base58Check.decode_check(sig) do
+      # BLS signatures are: 4-byte prefix + 96-byte signature, decode_check/1 has
+      # checked and removed the 4-byte checksum
+      {:ok, <<@prefix_blsig, sig_data::binary-size(96)>>} ->
         {:ok, sig_data}
 
       _ ->
