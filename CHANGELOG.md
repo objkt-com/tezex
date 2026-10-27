@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- [crypto]: `extract_pubkey/1` and `decode_signature/1` verify the checksum and reject trailing bytes
+- [crypto]: `extract_pubkey/1` rejects secp256k1 and p256 keys that don't start with 02 or 03
+- [crypto]: `check_signature/4` returns `{:error, :invalid_signature}` for a signature with a bad checksum
+- [crypto]: `verify_signature/3` returns `false` instead of raising on input that doesn't decode
+- [crypto]: add `Base58Check.decode_check/1`
+- [forge]: `forge_public_key/2` raises on a key with a bad checksum
 - [forge]: `forge_public_key/2`, `unforge_public_key/2` and `forge_base58/2` handle tz4 (`BLpk`) public keys; `forge_public_key/2` used to raise on them, which also broke forging a tz4 reveal
 
 ## v5.0.0
