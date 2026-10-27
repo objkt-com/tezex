@@ -390,6 +390,11 @@ defmodule Tezex.MichelsonTest do
       assert_error(ty("list", [ty("nat")]), [1, -1], :invalid_value, [1])
     end
 
+    test "rejects an improper list" do
+      assert_error(ty("list", [ty("nat")]), [1 | 2], :invalid_value, [])
+      assert_error(ty("list", [ty("nat")]), [1, 2 | 3], :invalid_value, [])
+    end
+
     test "encodes a list of named pairs in order" do
       type =
         ty("list", [
@@ -416,6 +421,10 @@ defmodule Tezex.MichelsonTest do
 
     test "an element error has a {:key, element} segment" do
       assert_error(ty("set", [ty("nat")]), [1, -1], :invalid_value, [{:key, -1}])
+    end
+
+    test "rejects an improper list" do
+      assert_error(ty("set", [ty("nat")]), [1 | 2], :invalid_value, [])
     end
   end
 
@@ -1084,6 +1093,22 @@ defmodule Tezex.MichelsonTest do
 
       assert {:lambda, :nat, :string} == Michelson.schema(ty("lambda", [ty("nat"), ty("string")]))
       assert {:contract, :unit} == Michelson.schema(ty("contract", [ty("unit")]))
+    end
+
+    test "annots that aren't a list are no name" do
+      type = ty("pair", [Map.put(ty("nat"), "annots", "%a"), ty("nat")])
+      assert {:ok, pair(int(1), int(2))} == Michelson.encode(type, {1, 2})
+      assert {:nat, :nat} == Michelson.schema(type)
+    end
+
+    test "a malformed type is unsupported instead of raising" do
+      assert {:unsupported, %{}} == Michelson.schema(%{})
+      assert {:unsupported, []} == Michelson.schema([])
+
+      assert {:or, [{:left, {:unsupported, "x"}}, {:right, :nat}]} ==
+               Michelson.schema(ty("or", ["x", ty("nat")]))
+
+      assert {{:unsupported, "x"}, :nat} == Michelson.schema(ty("pair", ["x", ty("nat")]))
     end
 
     test "containers of named types" do
