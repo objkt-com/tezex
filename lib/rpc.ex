@@ -8,6 +8,7 @@ defmodule Tezex.Rpc do
   alias Tezex.Crypto
   alias Tezex.ForgeOperation
   alias Tezex.Rpc
+  alias Tezex.Rpc.EntrypointCache
   alias Tezex.Fee
 
   @type t() :: %__MODULE__{
@@ -33,6 +34,7 @@ defmodule Tezex.Rpc do
           | {:unexpected_response, term()}
           | {:invalid_counter, term()}
           | {:invalid_balance, term()}
+          | {:no_such_entrypoint, binary()}
 
   defstruct [:endpoint, chain_id: "main", headers: [], opts: []]
 
@@ -341,6 +343,52 @@ defmodule Tezex.Rpc do
         _ -> {:error, {:invalid_balance, balance}}
       end
     end
+  end
+
+  @doc """
+  Return the entrypoints of contract `address`, as the node sends them:
+  `%{"entrypoints" => %{name => type}, "unreachable" => [...]}`, where each
+  type is a Micheline expression. The node leaves out `"unreachable"` when it
+  is empty, and lists `"default"` only if the contract annotates a branch
+  `%default`.
+
+  Successful results are cached, see `Tezex.Rpc.EntrypointCache`.
+  """
+  @spec entrypoints(t(), nonempty_binary()) :: {:ok, map()} | {:error, transport_error()}
+  def entrypoints(%Rpc{} = rpc, address) do
+    EntrypointCache.fetch({rpc.endpoint, rpc.chain_id, address}, fn ->
+      get(rpc, "/blocks/head/context/contracts/#{address}/entrypoints")
+    end)
+  end
+
+  @doc """
+  Return the parameter type of entrypoint `name` of contract `address`, as a
+  Micheline expression.
+
+  For `"default"` on a contract that has no `%default` annotation, the node
+  returns the whole parameter type, so this also gives the type of a call
+  without an entrypoint.
+
+  The node answers 404 when the name is unknown, when `address` is an
+  implicit account and when the contract doesn't exist. All three return
+  `{:error, {:no_such_entrypoint, name}}`.
+
+  Successful results are cached, see `Tezex.Rpc.EntrypointCache`.
+  """
+  @spec entrypoint(t(), nonempty_binary(), nonempty_binary()) ::
+          {:ok, map()} | {:error, transport_error() | {:no_such_entrypoint, binary()}}
+  def entrypoint(%Rpc{} = rpc, address, name) do
+    EntrypointCache.fetch({rpc.endpoint, rpc.chain_id, address, name}, fn ->
+      encoded_name = URI.encode(name, &URI.char_unreserved?/1)
+
+      case get(rpc, "/blocks/head/context/contracts/#{address}/entrypoints/#{encoded_name}") do
+        {:error, {:http_status, %Finch.Response{status: 404}}} ->
+          {:error, {:no_such_entrypoint, name}}
+
+        result ->
+          result
+      end
+    end)
   end
 
   @spec get(Tezex.Rpc.t(), nonempty_binary()) ::
