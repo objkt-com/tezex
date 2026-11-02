@@ -9,6 +9,7 @@ defmodule Tezex.RpcTest do
 
   @shadownet_1_address "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew"
   @shadownet_1_pkey "edsk33h91RysSBUiYyEWbeRwo41YeZrtMPTNsuZ9nzsYWwiV8CFyKi"
+  @shadownet_1_pubkey "edpkuCSbhVVhh6QKcvxK6QxdBf33qp2Pa4yBrWmoio6ntZ679SKXsD"
   @shadownet_2_address "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B"
   @branch "BLWdshvgEYbtUaABnmqkMuyMezpfsu36DEJPDJN63CW3TFuk7bP"
 
@@ -46,6 +47,25 @@ defmodule Tezex.RpcTest do
                  "kind" => "transaction",
                  "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
                  "storage_limit" => "257"
+               }
+             ]
+           } == Rpc.prepare_operation(contents, @shadownet_1_address, 1123, @branch)
+  end
+
+  test "prepare_operation/4 picks the reveal gas limit from the wallet address" do
+    contents = [%{"kind" => "reveal", "public_key" => @shadownet_1_pubkey}]
+
+    assert %{
+             "branch" => @branch,
+             "contents" => [
+               %{
+                 "counter" => "1123",
+                 "fee" => "0",
+                 "gas_limit" => "176",
+                 "kind" => "reveal",
+                 "public_key" => @shadownet_1_pubkey,
+                 "source" => @shadownet_1_address,
+                 "storage_limit" => "0"
                }
              ]
            } == Rpc.prepare_operation(contents, @shadownet_1_address, 1123, @branch)

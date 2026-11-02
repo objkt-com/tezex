@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [rpc]: `prepare_operation/4` and `send_operation/5` no longer raise on a reveal
 - [crypto]: `extract_pubkey/1` and `decode_signature/1` verify the checksum and reject trailing bytes
 - [crypto]: `extract_pubkey/1` rejects secp256k1 and p256 keys that don't start with 02 or 03
 - [crypto]: `check_signature/4` returns `{:error, :invalid_signature}` for a signature with a bad checksum

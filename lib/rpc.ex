@@ -67,12 +67,12 @@ defmodule Tezex.Rpc do
       transactions
       |> Enum.with_index(counter)
       |> Enum.map(fn {content, counter} ->
+        content = Map.put(content, "source", wallet_address)
         gas_limit = min(hard_gas_limit_per_content, Fee.default_gas_limit(content))
         storage_limit = min(hard_storage_limit_per_content, Fee.default_storage_limit(content))
 
         Map.merge(content, %{
           "counter" => Integer.to_string(counter),
-          "source" => wallet_address,
           "gas_limit" => Integer.to_string(gas_limit),
           "storage_limit" => Integer.to_string(storage_limit),
           "fee" => "0"
