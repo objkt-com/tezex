@@ -7,11 +7,9 @@ defmodule Tezex.RpcTest do
   alias Tezex.TransactionFixture
   doctest Tezex.Rpc, import: true
 
-  @endpoint "https://ghostnet.ecadinfra.com"
-  @ghostnet_rpc %Rpc{endpoint: @endpoint}
-  @ghostnet_1_address "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew"
-  @ghostnet_1_pkey "edsk33h91RysSBUiYyEWbeRwo41YeZrtMPTNsuZ9nzsYWwiV8CFyKi"
-  @ghostnet_2_address "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B"
+  @shadownet_1_address "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew"
+  @shadownet_1_pkey "edsk33h91RysSBUiYyEWbeRwo41YeZrtMPTNsuZ9nzsYWwiV8CFyKi"
+  @shadownet_2_address "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B"
   @branch "BLWdshvgEYbtUaABnmqkMuyMezpfsu36DEJPDJN63CW3TFuk7bP"
 
   @shadownet_endpoint "https://rpc.shadownet.teztnets.com"
@@ -26,14 +24,14 @@ defmodule Tezex.RpcTest do
   @tag :tezos
   test "get_counter_for_account" do
     assert {:ok, counter} =
-             Rpc.get_counter_for_account(@ghostnet_rpc, "tz1LKpeN8ZSSFNyTWiBNaE4u4sjaq7J1Vz2z")
+             Rpc.get_counter_for_account(@shadownet_rpc, "tz1LKpeN8ZSSFNyTWiBNaE4u4sjaq7J1Vz2z")
 
     assert is_integer(counter)
   end
 
   test "prepare_operation/4" do
     contents = [
-      %{"amount" => "100", "destination" => @ghostnet_2_address, "kind" => "transaction"}
+      %{"amount" => "100", "destination" => @shadownet_2_address, "kind" => "transaction"}
     ]
 
     assert %{
@@ -50,7 +48,7 @@ defmodule Tezex.RpcTest do
                  "storage_limit" => "257"
                }
              ]
-           } == Rpc.prepare_operation(contents, @ghostnet_1_address, 1123, @branch)
+           } == Rpc.prepare_operation(contents, @shadownet_1_address, 1123, @branch)
   end
 
   test "forge_and_sign_operation/2" do
@@ -73,12 +71,12 @@ defmodule Tezex.RpcTest do
     result =
       "6940b2318870c4b84862aef187c1bbcd4138170459e85092fe34be5d179f40ac6c00980d7cebb50d4b83a4e3307b3ca1b40ebe8f71ab00e308ab0b8102640000b75f0c30536bee108b068d90b151ce846aca11b1009bc207291f08c7117ea3a341328a036ce7bd5da996d9148cc491f96c3097748d7adcdb60599504ae5227aea4a6e69d536baaf96ae2bbb6c261a69d000b323f0a"
 
-    assert {:ok, result} == Rpc.forge_and_sign_operation(operation, @ghostnet_1_pkey)
+    assert {:ok, result} == Rpc.forge_and_sign_operation(operation, @shadownet_1_pkey)
   end
 
   test "forge_and_sign_operation/2 propagates a missing-keys error" do
     assert {:error, {:missing_keys, ["branch"]}} =
-             Rpc.forge_and_sign_operation(%{"contents" => []}, @ghostnet_1_pkey)
+             Rpc.forge_and_sign_operation(%{"contents" => []}, @shadownet_1_pkey)
   end
 
   describe "fill_operation_fee/3" do
@@ -207,19 +205,29 @@ defmodule Tezex.RpcTest do
     end
 
     test "a contract operation" do
-      contents = TransactionFixture.offer(@ghostnet_1_address)
+      contents = TransactionFixture.offer(@shadownet_1_address)
 
       assert {:ok, operation_id} =
-               Rpc.send_operation(@ghostnet_rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)
+               Rpc.send_operation(
+                 @shadownet_rpc,
+                 contents,
+                 @shadownet_1_address,
+                 @shadownet_1_pkey
+               )
 
       assert is_binary(operation_id)
     end
 
     test "a transfer" do
-      contents = TransactionFixture.offer(@ghostnet_2_address)
+      contents = TransactionFixture.offer(@shadownet_2_address)
 
       assert {:ok, operation_id} =
-               Rpc.send_operation(@ghostnet_rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)
+               Rpc.send_operation(
+                 @shadownet_rpc,
+                 contents,
+                 @shadownet_1_address,
+                 @shadownet_1_pkey
+               )
 
       assert is_binary(operation_id)
     end
@@ -228,7 +236,7 @@ defmodule Tezex.RpcTest do
   @tag :tezos
   test "return preapply errors" do
     contents = [
-      %{"amount" => "1000000000", "destination" => @ghostnet_2_address, "kind" => "transaction"}
+      %{"amount" => "1000000000", "destination" => @shadownet_2_address, "kind" => "transaction"}
     ]
 
     assert {:error,
@@ -245,7 +253,7 @@ defmodule Tezex.RpcTest do
                  %{"amounts" => [_, "1000000000"], "id" => error_b, "kind" => "temporary"}
                ]
              ]}} =
-             Rpc.send_operation(@ghostnet_rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)
+             Rpc.send_operation(@shadownet_rpc, contents, @shadownet_1_address, @shadownet_1_pkey)
 
     assert String.ends_with?(error_a, "balance_too_low"), error_a
     assert String.ends_with?(error_b, "subtraction_underflow"), error_b
