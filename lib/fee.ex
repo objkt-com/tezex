@@ -9,16 +9,15 @@ defmodule Tezex.Fee do
   @reserve 10
 
   @hard_gas_limit_per_operation 1_040_000
-  def hard_gas_limit_per_operation, do: @hard_gas_limit_per_operation
-
   @hard_storage_limit_per_operation 60_000
-  def hard_storage_limit_per_operation, do: @hard_storage_limit_per_operation
+  @default_gas_reserve 100
 
   # size of serialized branch and signature + safe reserve
   @extra_size 32 + 64
-  def extra_size, do: @extra_size
 
-  @default_gas_reserve 100
+  def hard_gas_limit_per_operation, do: @hard_gas_limit_per_operation
+  def hard_storage_limit_per_operation, do: @hard_storage_limit_per_operation
+  def extra_size, do: @extra_size
   def default_gas_reserve, do: @default_gas_reserve
 
   @spec calculate_fee(map(), pos_integer(),
@@ -47,7 +46,6 @@ defmodule Tezex.Fee do
     end
   end
 
-  # Voir pour utiliser hard_gas_limit_per_content aussi ?
   def default_gas_limit(content) do
     case content["kind"] do
       "reveal" ->
@@ -67,9 +65,11 @@ defmodule Tezex.Fee do
         @hard_gas_limit_per_operation
 
       "transaction" ->
-        if originated_account?(content["destination"]),
-          do: @hard_gas_limit_per_operation,
-          else: @default_transaction_gas_limit
+        if originated_account?(content["destination"]) do
+          @hard_gas_limit_per_operation
+        else
+          @default_transaction_gas_limit
+        end
     end
   end
 
@@ -85,9 +85,11 @@ defmodule Tezex.Fee do
         @hard_storage_limit_per_operation
 
       "transaction" ->
-        if originated_account?(content["destination"]),
-          do: @hard_storage_limit_per_operation,
-          else: @default_transaction_storage_limit
+        if originated_account?(content["destination"]) do
+          @hard_storage_limit_per_operation
+        else
+          @default_transaction_storage_limit
+        end
 
       kind
       when kind in ~w(register_global_constant transfer_ticket smart_rollup_add_messages smart_rollup_execute_outbox_message) ->
