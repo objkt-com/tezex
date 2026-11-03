@@ -234,6 +234,14 @@ defmodule Tezex.RpcTest do
       end
     end
 
+    test "the caller's limits get no reserve" do
+      assert {:ok, %{"contents" => [%{"gas_limit" => "1040000", "storage_limit" => "60000"}]}} =
+               Rpc.fill_operation_fee(%{"contents" => []}, OperationResultFixture.transfer(),
+                 gas_limit: 1_040_000,
+                 storage_limit: 60_000
+               )
+    end
+
     test "the fee from the simulation doesn't change the final fee" do
       [content] = OperationResultFixture.transfer()
 

@@ -6,6 +6,7 @@
 - [rpc]: `prepare_operation/4` sets a default fee on the first content; the source's balance must cover it during simulation
 - [rpc]: `fill_operation_fee/3` puts the whole fee on the first content
 - [rpc]: `fill_operation_fee/3` no longer sets a gas limit too low for a reveal or a delegation
+- [rpc]: `fill_operation_fee/3` no longer adds reserves to the caller's `:gas_limit` and `:storage_limit`
 - [rpc]: `fill_operation_fee/3` computes the fee from the new limits, not the simulated ones
 - [fee]: add `default_fee/2` and `extra_size/1`
 - [fee]: count a 96-byte signature for a tz4 source

@@ -137,16 +137,27 @@ defmodule Tezex.Rpc do
     contents =
       Enum.map(preapplied_operations, fn content ->
         if validation_passes(content["kind"]) == 3 do
+          # The reserves go on the limits computed from the simulation, never on the caller's.
+          {content_gas_reserve, content_burn_reserve} =
+            if content["kind"] in ~w(origination transaction) do
+              {gas_reserve, burn_reserve}
+            else
+              {0, 0}
+            end
+
           gas_limit_new =
             if is_nil(gas_limit) do
-              get_preapplied_operation_values(content, fn x ->
-                v =
-                  Map.get(x, "consumed_milligas", "0")
-                  |> String.to_integer()
+              consumed_gas =
+                get_preapplied_operation_values(content, fn x ->
+                  v =
+                    Map.get(x, "consumed_milligas", "0")
+                    |> String.to_integer()
 
-                ceil(v / 1000)
-              end)
-              |> Enum.reduce(&(&1 + &2))
+                  ceil(v / 1000)
+                end)
+                |> Enum.reduce(&(&1 + &2))
+
+              consumed_gas + content_gas_reserve
             else
               div(gas_limit, number_contents)
             end
@@ -178,19 +189,12 @@ defmodule Tezex.Rpc do
                 end)
                 |> Enum.reduce(&(&1 + &2))
 
-              paid_storage_size_diff + burned
+              paid_storage_size_diff + burned + content_burn_reserve
             else
               div(storage_limit, number_contents)
             end
 
           content = Map.drop(content, ~w(metadata))
-
-          {gas_limit_new, storage_limit_new} =
-            if content["kind"] in ~w(origination transaction) do
-              {gas_limit_new + gas_reserve, storage_limit_new + burn_reserve}
-            else
-              {gas_limit_new, storage_limit_new}
-            end
 
           extra_size = 1 + div(Fee.extra_size(content["source"]), number_contents)
 
