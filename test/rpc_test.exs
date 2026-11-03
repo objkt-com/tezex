@@ -1,6 +1,7 @@
 defmodule Tezex.RpcTest do
   use ExUnit.Case, async: true
 
+  alias Tezex.ForgeOperation
   alias Tezex.OperationResultFixture
   alias Tezex.Rpc
   alias Tezex.Rpc.EntrypointCache
@@ -19,6 +20,7 @@ defmodule Tezex.RpcTest do
   @shadownet_fa2 "KT1XsH18aY2GcgSMBAdp2EzHw828iJx2WptU"
   @shadownet_fa2_entrypoints ~w(balance_of mint set_administrator set_metadata set_pause transfer update_operators)
   @shadownet_implicit "tz1fFtfd49jRi4SmaeWCWMwJbikPSjGf1HKc"
+  @tz4_address "tz4NWRt3aFyFU2Ydah917Eehxv6uf97j8tpZ"
   # Valid KT1 checksum over 20 zero bytes, never originated.
   @missing_contract "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT"
 
@@ -42,7 +44,7 @@ defmodule Tezex.RpcTest do
                  "amount" => "100",
                  "counter" => "1123",
                  "destination" => "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B",
-                 "fee" => "0",
+                 "fee" => "572",
                  "gas_limit" => "3040",
                  "kind" => "transaction",
                  "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
@@ -60,7 +62,7 @@ defmodule Tezex.RpcTest do
              "contents" => [
                %{
                  "counter" => "1123",
-                 "fee" => "0",
+                 "fee" => "294",
                  "gas_limit" => "176",
                  "kind" => "reveal",
                  "public_key" => @shadownet_1_pubkey,
@@ -69,6 +71,74 @@ defmodule Tezex.RpcTest do
                }
              ]
            } == Rpc.prepare_operation(contents, @shadownet_1_address, 1123, @branch)
+  end
+
+  test "prepare_operation/4 sets the default fee of a contract call from the hard gas limit" do
+    contents = [
+      %{
+        "amount" => "0",
+        "destination" => @shadownet_fa2,
+        "kind" => "transaction",
+        "parameters" => %{"entrypoint" => "set_pause", "value" => %{"prim" => "True"}}
+      }
+    ]
+
+    assert %{"contents" => [%{"fee" => "104287", "gas_limit" => "1040000"}]} =
+             Rpc.prepare_operation(contents, @shadownet_1_address, 1123, @branch)
+  end
+
+  test "prepare_operation/4 sets the default fee on the first content only" do
+    contents = [
+      %{"kind" => "reveal", "public_key" => @shadownet_1_pubkey},
+      %{"amount" => "0", "destination" => @shadownet_fa2, "kind" => "transaction"}
+    ]
+
+    assert %{
+             "contents" => [
+               # The contract call's fee can make the whole fee 3 bytes long, 16384 is the
+               # smallest 3-byte fee.
+               %{"counter" => "1123", "fee" => "16384", "gas_limit" => "176"},
+               %{"counter" => "1124", "fee" => "0", "gas_limit" => "520000"}
+             ]
+           } = Rpc.prepare_operation(contents, @shadownet_1_address, 1123, @branch)
+  end
+
+  # The first content pays the gas for checking the signature, which grows with the operation's
+  # size, and a reveal or a delegation gets no gas reserve.
+  test "a batch is never bigger once its fees are filled than when simulated" do
+    reveal = %{"kind" => "reveal", "public_key" => @shadownet_1_pubkey}
+    applied = fn milligas -> %{"status" => "applied", "consumed_milligas" => milligas} end
+
+    batches = [
+      {[reveal, %{"kind" => "delegation", "delegate" => @shadownet_1_address}],
+       [applied.("172345"), applied.("200000")]},
+      {[
+         reveal,
+         %{"kind" => "transaction", "amount" => "1", "destination" => @shadownet_2_address}
+       ],
+       [applied.("172345"), Map.put(applied.("2101000"), "allocated_destination_contract", true)]},
+      # The total fee needs one more byte than the reveal's default fee, and the call's limits
+      # keep their size.
+      {[reveal, %{"kind" => "transaction", "amount" => "0", "destination" => @shadownet_fa2}],
+       [applied.("172345"), Map.put(applied.("200000000"), "paid_storage_size_diff", "20000")]}
+    ]
+
+    for {contents, results} <- batches do
+      operation = Rpc.prepare_operation(contents, @shadownet_1_address, 1123, @branch)
+
+      preapplied =
+        Enum.zip_with(operation["contents"], results, fn content, result ->
+          Map.put(content, "metadata", %{"operation_result" => result})
+        end)
+
+      {:ok, filled} = Rpc.fill_operation_fee(operation, preapplied)
+      {:ok, simulated_bytes} = ForgeOperation.operation_group(operation)
+      {:ok, filled_bytes} = ForgeOperation.operation_group(filled)
+
+      assert byte_size(filled_bytes) <= byte_size(simulated_bytes)
+      assert [%{"fee" => fee}, %{"fee" => "0"}] = filled["contents"]
+      assert String.to_integer(fee) > 0
+    end
   end
 
   test "forge_and_sign_operation/2" do
@@ -108,7 +178,7 @@ defmodule Tezex.RpcTest do
                     "amount" => "1000000",
                     "counter" => "26949360",
                     "destination" => "KT1MFWsAXGUZ4gFkQnjByWjrrVtuQi4Tya8G",
-                    "fee" => "651",
+                    "fee" => "649",
                     "gas_limit" => "2419",
                     "kind" => "transaction",
                     "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
@@ -124,7 +194,7 @@ defmodule Tezex.RpcTest do
                 "contents" => [
                   %{
                     "amount" => "100",
-                    "fee" => "285",
+                    "fee" => "284",
                     "gas_limit" => "269",
                     "storage_limit" => "100"
                   }
@@ -136,13 +206,39 @@ defmodule Tezex.RpcTest do
       assert {:ok,
               %{
                 "contents" => [
-                  %{"fee" => "2372", "gas_limit" => "20847", "storage_limit" => "103"}
+                  %{"fee" => "2370", "gas_limit" => "20847", "storage_limit" => "103"}
                 ]
               }} =
                Rpc.fill_operation_fee(
                  %{"contents" => []},
                  OperationResultFixture.settle_auction()
                )
+    end
+
+    # The mempool's minimum: 100 mutez, 1 mutez per byte of the operation (branch, contents and
+    # signature) and 0.1 mutez per unit of gas limit.
+    test "the fee covers the mempool's minimum for a 64 and a 96-byte signature" do
+      [content] = OperationResultFixture.transfer()
+
+      for {source, signature_size} <- [{@shadownet_1_address, 64}, {@tz4_address, 96}] do
+        operation = %{"branch" => @branch, "contents" => []}
+
+        {:ok, %{"contents" => [filled]} = filled_operation} =
+          Rpc.fill_operation_fee(operation, [%{content | "source" => source}])
+
+        {:ok, forged} = ForgeOperation.operation_group(filled_operation)
+        size = div(byte_size(forged), 2) + signature_size
+        minimum = 100 + size + ceil(String.to_integer(filled["gas_limit"]) / 10)
+
+        assert String.to_integer(filled["fee"]) >= minimum
+      end
+    end
+
+    test "the fee from the simulation doesn't change the final fee" do
+      [content] = OperationResultFixture.transfer()
+
+      assert {:ok, %{"contents" => [%{"fee" => "284"}]}} =
+               Rpc.fill_operation_fee(%{"contents" => []}, [%{content | "fee" => "104500"}])
     end
 
     test "propagates a missing-keys error" do

@@ -3,6 +3,12 @@
 ## Unreleased
 
 - [rpc]: `prepare_operation/4` and `send_operation/5` no longer raise on a reveal
+- [rpc]: `prepare_operation/4` sets a default fee on the first content; the source's balance must cover it during simulation
+- [rpc]: `fill_operation_fee/3` puts the whole fee on the first content
+- [rpc]: `fill_operation_fee/3` no longer sets a gas limit too low for a reveal or a delegation
+- [rpc]: `fill_operation_fee/3` computes the fee from the new limits, not the simulated ones
+- [fee]: add `default_fee/2` and `extra_size/1`
+- [fee]: count a 96-byte signature for a tz4 source
 - [crypto]: `extract_pubkey/1` and `decode_signature/1` verify the checksum and reject trailing bytes
 - [crypto]: `extract_pubkey/1` rejects secp256k1 and p256 keys that don't start with 02 or 03
 - [crypto]: `check_signature/4` returns `{:error, :invalid_signature}` for a signature with a bad checksum

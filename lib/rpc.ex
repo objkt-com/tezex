@@ -7,6 +7,7 @@ defmodule Tezex.Rpc do
 
   alias Tezex.Crypto
   alias Tezex.Crypto.Base58Check
+  alias Tezex.Forge
   alias Tezex.ForgeOperation
   alias Tezex.Rpc
   alias Tezex.Rpc.EntrypointCache
@@ -81,8 +82,42 @@ defmodule Tezex.Rpc do
 
     %{
       "branch" => branch,
-      "contents" => contents
+      "contents" => put_default_fee(contents)
     }
+  end
+
+  # The first content pays the gas for checking the signature, which grows with the size of the
+  # operation, and fill_operation_fee/3 takes the gas limit from the simulation. So the first
+  # content, which pays the whole fee once it is filled, is simulated with the default fee, not 0,
+  # raised when needed so it takes as many bytes as the largest whole fee: the signed operation is
+  # then never bigger than the simulated one.
+  # A content that doesn't forge keeps fee 0: preapply_operation/4 returns the forge error.
+  defp put_default_fee([first | rest] = contents) do
+    with {:ok, fee} <- Fee.default_fee(first, Fee.default_gas_limit(first)),
+         {:ok, max_total_fee} <- max_total_fee(contents) do
+      fee = max(fee, smallest_fee_of_size(max_total_fee))
+      [%{first | "fee" => Integer.to_string(fee)} | rest]
+    else
+      {:error, _} -> contents
+    end
+  end
+
+  # The largest fee fill_operation_fee/3 computes for these contents with its default reserves:
+  # each content's gas limit and the gas reserve stand in for its consumed gas.
+  defp max_total_fee(contents) do
+    Enum.reduce_while(contents, {:ok, 0}, fn content, {:ok, total} ->
+      gas_limit = String.to_integer(content["gas_limit"]) + Fee.default_gas_reserve()
+
+      case Fee.default_fee(content, gas_limit) do
+        {:ok, fee} -> {:cont, {:ok, total + fee}}
+        error -> {:halt, error}
+      end
+    end)
+  end
+
+  # The smallest fee forged on as many bytes as `fee`.
+  defp smallest_fee_of_size(fee) do
+    128 ** (byte_size(Forge.forge_nat(fee)) - 1)
   end
 
   @spec fill_operation_fee(operation(), list(preapplied_operations()),
@@ -157,33 +192,41 @@ defmodule Tezex.Rpc do
               {gas_limit_new, storage_limit_new}
             end
 
-          extra_size = 1 + div(Fee.extra_size(), number_contents)
+          extra_size = 1 + div(Fee.extra_size(content["source"]), number_contents)
+
+          content = %{
+            content
+            | "gas_limit" => Integer.to_string(gas_limit_new),
+              "storage_limit" => Integer.to_string(storage_limit_new),
+              "fee" => "0"
+          }
 
           case Fee.calculate_fee(content, gas_limit_new, extra_size: extra_size) do
-            {:ok, fee} ->
-              {:ok,
-               %{
-                 content
-                 | "gas_limit" => Integer.to_string(gas_limit_new),
-                   "storage_limit" => Integer.to_string(storage_limit_new),
-                   "fee" => Integer.to_string(fee)
-               }}
-
-            err ->
-              err
+            {:ok, fee} -> {:ok, content, fee}
+            err -> err
           end
         else
-          {:ok, content}
+          {:ok, content, 0}
         end
       end)
 
     first_error = Enum.find(contents, &(elem(&1, 0) == :error))
 
     if is_nil(first_error) do
-      {:ok, %{operation | "contents" => Enum.map(contents, &elem(&1, 1))}}
+      fee = contents |> Enum.map(&elem(&1, 2)) |> Enum.sum()
+      {:ok, %{operation | "contents" => contents |> Enum.map(&elem(&1, 1)) |> put_total_fee(fee)}}
     else
       first_error
     end
+  end
+
+  # The first content pays the whole operation's fee, the others keep fee 0.
+  defp put_total_fee(contents, 0) do
+    contents
+  end
+
+  defp put_total_fee([first | rest], fee) do
+    [Map.put(first, "fee", Integer.to_string(fee)) | rest]
   end
 
   defp get_preapplied_operation_values(op, value_fun) do
