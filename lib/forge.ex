@@ -80,6 +80,8 @@ defmodule Tezex.Forge do
     %{e_prefix: "sppk", e_len: 55, d_prefix: <<3, 254, 226, 86>>, d_len: 33},
     # p256 pubkey
     %{e_prefix: "p2pk", e_len: 55, d_prefix: <<3, 178, 139, 127>>, d_len: 33},
+    # BLS-MinPk pubkey
+    %{e_prefix: "BLpk", e_len: 76, d_prefix: <<6, 149, 135, 204>>, d_len: 48},
     # secp256k1 scalar
     %{e_prefix: "SSp", e_len: 53, d_prefix: <<38, 248, 136>>, d_len: 33},
     # secp256k1 element
@@ -397,6 +399,7 @@ defmodule Tezex.Forge do
       "edpk" -> <<0>> <> res
       "sppk" -> <<1>> <> res
       "p2pk" -> <<2>> <> res
+      "BLpk" -> <<3>> <> res
       _ -> raise "Unrecognized key type: #{prefix}"
     end
     |> encode_output(output_encoding)
@@ -411,7 +414,8 @@ defmodule Tezex.Forge do
       %{
         <<0>> => <<13, 15, 37, 217>>,
         <<1>> => <<3, 254, 226, 86>>,
-        <<2>> => <<3, 178, 139, 127>>
+        <<2>> => <<3, 178, 139, 127>>,
+        <<3>> => <<6, 149, 135, 204>>
       }
 
     prefix = key_prefix[binary_part(data, 0, 1)]

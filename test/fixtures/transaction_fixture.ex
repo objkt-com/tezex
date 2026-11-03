@@ -12,7 +12,7 @@ defmodule Tezex.TransactionFixture do
       %{
         "kind" => "transaction",
         "amount" => "1000000",
-        "destination" => "KT1MFWsAXGUZ4gFkQnjByWjrrVtuQi4Tya8G",
+        "destination" => "KT1UErZCry4DLRwqwWon5tECgpKRaMfQ5yEP",
         "parameters" => %{
           "entrypoint" => "offer",
           "value" => %{
@@ -22,13 +22,13 @@ defmodule Tezex.TransactionFixture do
                 "prim" => "Pair",
                 "args" => [
                   %{
-                    "string" => "KT1L9L24QjU4qHmej6j1G5DTqhZanPxHH5ie"
+                    "string" => "KT1FbgPBGcr8SfweZQqi3coA5c55D4Z7Jcd6"
                   },
                   %{
                     "prim" => "Some",
                     "args" => [
                       %{
-                        "int" => "0"
+                        "int" => "1"
                       }
                     ]
                   }
@@ -81,15 +81,23 @@ defmodule Tezex.TransactionFixture do
                               %{
                                 "prim" => "Pair",
                                 "args" => [
-                                  [],
+                                  %{
+                                    "prim" => "None"
+                                  },
                                   %{
                                     "prim" => "Pair",
                                     "args" => [
+                                      [],
                                       %{
-                                        "prim" => "None"
-                                      },
-                                      %{
-                                        "prim" => "None"
+                                        "prim" => "Pair",
+                                        "args" => [
+                                          %{
+                                            "prim" => "None"
+                                          },
+                                          %{
+                                            "prim" => "None"
+                                          }
+                                        ]
                                       }
                                     ]
                                   }

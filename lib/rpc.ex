@@ -6,8 +6,11 @@ defmodule Tezex.Rpc do
   """
 
   alias Tezex.Crypto
+  alias Tezex.Crypto.Base58Check
+  alias Tezex.Forge
   alias Tezex.ForgeOperation
   alias Tezex.Rpc
+  alias Tezex.Rpc.EntrypointCache
   alias Tezex.Fee
 
   @type t() :: %__MODULE__{
@@ -33,16 +36,29 @@ defmodule Tezex.Rpc do
           | {:unexpected_response, term()}
           | {:invalid_counter, term()}
           | {:invalid_balance, term()}
+          | {:no_such_entrypoint, binary()}
+          | {:invalid_address, binary()}
+          | {:invalid_entrypoint, binary()}
+          | :no_transactions
+
+  # KT1, tz1, tz2, tz3, tz4
+  @address_prefixes [
+    <<2, 90, 121>>,
+    <<6, 161, 159>>,
+    <<6, 161, 161>>,
+    <<6, 161, 164>>,
+    <<6, 161, 166>>
+  ]
 
   defstruct [:endpoint, chain_id: "main", headers: [], opts: []]
 
   @spec prepare_operation(
-          list(transaction()),
+          nonempty_list(transaction()),
           nonempty_binary(),
           integer(),
           nonempty_binary()
         ) :: operation()
-  def prepare_operation(transactions, wallet_address, counter, branch) do
+  def prepare_operation([_ | _] = transactions, wallet_address, counter, branch) do
     transactions_length = length(transactions)
     hard_gas_limit_per_content = div(Fee.hard_gas_limit_per_operation(), transactions_length)
 
@@ -53,12 +69,12 @@ defmodule Tezex.Rpc do
       transactions
       |> Enum.with_index(counter)
       |> Enum.map(fn {content, counter} ->
+        content = Map.put(content, "source", wallet_address)
         gas_limit = min(hard_gas_limit_per_content, Fee.default_gas_limit(content))
         storage_limit = min(hard_storage_limit_per_content, Fee.default_storage_limit(content))
 
         Map.merge(content, %{
           "counter" => Integer.to_string(counter),
-          "source" => wallet_address,
           "gas_limit" => Integer.to_string(gas_limit),
           "storage_limit" => Integer.to_string(storage_limit),
           "fee" => "0"
@@ -67,8 +83,42 @@ defmodule Tezex.Rpc do
 
     %{
       "branch" => branch,
-      "contents" => contents
+      "contents" => put_default_fee(contents)
     }
+  end
+
+  # The first content pays the gas for checking the signature, which grows with the size of the
+  # operation, and fill_operation_fee/3 takes the gas limit from the simulation. So the first
+  # content, which pays the whole fee once it is filled, is simulated with the default fee, not 0,
+  # raised when needed so it takes as many bytes as the largest whole fee: the signed operation is
+  # then never bigger than the simulated one.
+  # A content that doesn't forge keeps fee 0: preapply_operation/4 returns the forge error.
+  defp put_default_fee([first | rest] = contents) do
+    with {:ok, fee} <- Fee.default_fee(first, Fee.default_gas_limit(first)),
+         {:ok, max_total_fee} <- max_total_fee(contents) do
+      fee = max(fee, smallest_fee_of_size(max_total_fee))
+      [%{first | "fee" => Integer.to_string(fee)} | rest]
+    else
+      {:error, _} -> contents
+    end
+  end
+
+  # The largest fee fill_operation_fee/3 computes for these contents with its default reserves:
+  # each content's gas limit and the gas reserve stand in for its consumed gas.
+  defp max_total_fee(contents) do
+    Enum.reduce_while(contents, {:ok, 0}, fn content, {:ok, total} ->
+      gas_limit = String.to_integer(content["gas_limit"]) + Fee.default_gas_reserve()
+
+      case Fee.default_fee(content, gas_limit) do
+        {:ok, fee} -> {:cont, {:ok, total + fee}}
+        error -> {:halt, error}
+      end
+    end)
+  end
+
+  # The smallest fee forged on as many bytes as `fee`.
+  defp smallest_fee_of_size(fee) do
+    128 ** (byte_size(Forge.forge_nat(fee)) - 1)
   end
 
   @spec fill_operation_fee(operation(), list(preapplied_operations()),
@@ -88,16 +138,27 @@ defmodule Tezex.Rpc do
     contents =
       Enum.map(preapplied_operations, fn content ->
         if validation_passes(content["kind"]) == 3 do
+          # The reserves go on the limits computed from the simulation, never on the caller's.
+          {content_gas_reserve, content_burn_reserve} =
+            if content["kind"] in ~w(origination transaction) do
+              {gas_reserve, burn_reserve}
+            else
+              {0, 0}
+            end
+
           gas_limit_new =
             if is_nil(gas_limit) do
-              get_preapplied_operation_values(content, fn x ->
-                v =
-                  Map.get(x, "consumed_milligas", "0")
-                  |> String.to_integer()
+              consumed_gas =
+                get_preapplied_operation_values(content, fn x ->
+                  v =
+                    Map.get(x, "consumed_milligas", "0")
+                    |> String.to_integer()
 
-                ceil(v / 1000)
-              end)
-              |> Enum.reduce(&(&1 + &2))
+                  ceil(v / 1000)
+                end)
+                |> Enum.reduce(&(&1 + &2))
+
+              consumed_gas + content_gas_reserve
             else
               div(gas_limit, number_contents)
             end
@@ -129,47 +190,48 @@ defmodule Tezex.Rpc do
                 end)
                 |> Enum.reduce(&(&1 + &2))
 
-              paid_storage_size_diff + burned
+              paid_storage_size_diff + burned + content_burn_reserve
             else
               div(storage_limit, number_contents)
             end
 
           content = Map.drop(content, ~w(metadata))
 
-          {gas_limit_new, storage_limit_new} =
-            if content["kind"] in ~w(origination transaction) do
-              {gas_limit_new + gas_reserve, storage_limit_new + burn_reserve}
-            else
-              {gas_limit_new, storage_limit_new}
-            end
+          extra_size = 1 + div(Fee.extra_size(content["source"]), number_contents)
 
-          extra_size = 1 + div(Fee.extra_size(), number_contents)
+          content = %{
+            content
+            | "gas_limit" => Integer.to_string(gas_limit_new),
+              "storage_limit" => Integer.to_string(storage_limit_new),
+              "fee" => "0"
+          }
 
           case Fee.calculate_fee(content, gas_limit_new, extra_size: extra_size) do
-            {:ok, fee} ->
-              {:ok,
-               %{
-                 content
-                 | "gas_limit" => Integer.to_string(gas_limit_new),
-                   "storage_limit" => Integer.to_string(storage_limit_new),
-                   "fee" => Integer.to_string(fee)
-               }}
-
-            err ->
-              err
+            {:ok, fee} -> {:ok, content, fee}
+            err -> err
           end
         else
-          {:ok, content}
+          {:ok, content, 0}
         end
       end)
 
     first_error = Enum.find(contents, &(elem(&1, 0) == :error))
 
     if is_nil(first_error) do
-      {:ok, %{operation | "contents" => Enum.map(contents, &elem(&1, 1))}}
+      fee = contents |> Enum.map(&elem(&1, 2)) |> Enum.sum()
+      {:ok, %{operation | "contents" => contents |> Enum.map(&elem(&1, 1)) |> put_total_fee(fee)}}
     else
       first_error
     end
+  end
+
+  # The first content pays the whole operation's fee, the others keep fee 0.
+  defp put_total_fee(contents, 0) do
+    contents
+  end
+
+  defp put_total_fee([first | rest], fee) do
+    [Map.put(first, "fee", Integer.to_string(fee)) | rest]
   end
 
   defp get_preapplied_operation_values(op, value_fun) do
@@ -198,10 +260,10 @@ defmodule Tezex.Rpc do
         ) ::
           {:ok, any()} | {:error, error_reason()}
   def send_operation(%Rpc{} = rpc, transactions, wallet_address, encoded_private_key, opts \\ []) do
-    transactions = if is_map(transactions), do: [transactions], else: transactions
     offset = Keyword.get(opts, :offset, 0)
 
-    with {:ok, block_head} <- get_block_at_offset(rpc, offset),
+    with {:ok, transactions} <- transaction_list(transactions),
+         {:ok, block_head} <- get_block_at_offset(rpc, offset),
          branch = binary_part(block_head["hash"], 0, 51),
          protocol = block_head["protocol"],
          {:ok, counter} <- get_next_counter_for_account(rpc, wallet_address),
@@ -213,6 +275,10 @@ defmodule Tezex.Rpc do
       inject_operation(rpc, payload)
     end
   end
+
+  defp transaction_list([]), do: {:error, :no_transactions}
+  defp transaction_list(transactions) when is_list(transactions), do: {:ok, transactions}
+  defp transaction_list(transaction) when is_map(transaction), do: {:ok, [transaction]}
 
   @doc """
   Sign the forged operation and returns the forged operation+signature payload to be injected.
@@ -342,6 +408,87 @@ defmodule Tezex.Rpc do
       end
     end
   end
+
+  @doc """
+  Return the entrypoints of contract `address`, as the node sends them:
+  `%{"entrypoints" => %{name => type}, "unreachable" => [...]}`, where each
+  type is a Micheline expression. The node leaves out `"unreachable"` when it
+  is empty, and lists `"default"` only if the contract annotates a branch
+  `%default`.
+
+  Returns `{:error, {:invalid_address, address}}` when `address` isn't a
+  KT1, tz1, tz2, tz3 or tz4 address with a valid checksum.
+
+  Successful results are cached, see `Tezex.Rpc.EntrypointCache`.
+  """
+  @spec entrypoints(t(), nonempty_binary()) ::
+          {:ok, map()} | {:error, transport_error() | {:invalid_address, binary()}}
+  def entrypoints(%Rpc{} = rpc, address) do
+    with :ok <- check_address(address) do
+      EntrypointCache.fetch({rpc.endpoint, rpc.chain_id, address}, fn ->
+        get(rpc, "/blocks/head/context/contracts/#{address}/entrypoints")
+      end)
+    end
+  end
+
+  @doc """
+  Return the parameter type of entrypoint `name` of contract `address`, as a
+  Micheline expression.
+
+  For `"default"` on a contract that has no `%default` annotation, the node
+  returns the whole parameter type, so this also gives the type of a call
+  without an entrypoint.
+
+  The node answers 404 when the name is unknown, when `address` is an
+  implicit account and when the contract doesn't exist. All three return
+  `{:error, {:no_such_entrypoint, name}}`.
+
+  Returns `{:error, {:invalid_address, address}}` when `address` isn't a
+  KT1, tz1, tz2, tz3 or tz4 address with a valid checksum, and
+  `{:error, {:invalid_entrypoint, name}}` when `name` isn't 1 to 31 bytes long
+  or is `"."` or `".."`.
+
+  Successful results are cached, see `Tezex.Rpc.EntrypointCache`.
+  """
+  @spec entrypoint(t(), nonempty_binary(), nonempty_binary()) ::
+          {:ok, map()}
+          | {:error,
+             transport_error()
+             | {:no_such_entrypoint, binary()}
+             | {:invalid_address, binary()}
+             | {:invalid_entrypoint, binary()}}
+  def entrypoint(%Rpc{} = rpc, address, name) do
+    with :ok <- check_address(address),
+         :ok <- check_entrypoint(name) do
+      EntrypointCache.fetch({rpc.endpoint, rpc.chain_id, address, name}, fn ->
+        encoded_name = URI.encode(name, &URI.char_unreserved?/1)
+
+        case get(rpc, "/blocks/head/context/contracts/#{address}/entrypoints/#{encoded_name}") do
+          {:error, {:http_status, %Finch.Response{status: 404}}} ->
+            {:error, {:no_such_entrypoint, name}}
+
+          result ->
+            result
+        end
+      end)
+    end
+  end
+
+  defp check_address(address) do
+    case Base58Check.decode_check(address) do
+      {:ok, <<prefix::binary-size(3), _hash::binary-size(20)>>}
+      when prefix in @address_prefixes ->
+        :ok
+
+      _ ->
+        {:error, {:invalid_address, address}}
+    end
+  end
+
+  # An entrypoint name is 1 to 31 bytes. "." and ".." would change the URL's path.
+  defp check_entrypoint(name) when name in [".", ".."], do: {:error, {:invalid_entrypoint, name}}
+  defp check_entrypoint(name) when byte_size(name) in 1..31, do: :ok
+  defp check_entrypoint(name), do: {:error, {:invalid_entrypoint, name}}
 
   @spec get(Tezex.Rpc.t(), nonempty_binary()) ::
           {:ok, any()} | {:error, transport_error()}

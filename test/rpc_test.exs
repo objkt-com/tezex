@@ -1,63 +1,149 @@
 defmodule Tezex.RpcTest do
   use ExUnit.Case, async: true
 
+  alias Tezex.ForgeOperation
+  alias Tezex.OperationResultFixture
   alias Tezex.Rpc
+  alias Tezex.Rpc.EntrypointCache
+  alias Tezex.TransactionFixture
   doctest Tezex.Rpc, import: true
 
-  @endpoint "https://ghostnet.ecadinfra.com"
-  @ghostnet_1_address "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew"
-  @ghostnet_1_pkey "edsk33h91RysSBUiYyEWbeRwo41YeZrtMPTNsuZ9nzsYWwiV8CFyKi"
-  @ghostnet_2_address "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B"
+  @shadownet_1_address "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew"
+  @shadownet_1_pkey "edsk33h91RysSBUiYyEWbeRwo41YeZrtMPTNsuZ9nzsYWwiV8CFyKi"
+  @shadownet_1_pubkey "edpkuCSbhVVhh6QKcvxK6QxdBf33qp2Pa4yBrWmoio6ntZ679SKXsD"
+  @shadownet_2_address "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B"
+  @branch "BLWdshvgEYbtUaABnmqkMuyMezpfsu36DEJPDJN63CW3TFuk7bP"
+
+  @shadownet_endpoint "https://rpc.shadownet.teztnets.com"
+  @shadownet_rpc %Rpc{endpoint: @shadownet_endpoint}
+  # FA2 token contract on shadownet, with named entrypoints and no %default.
+  @shadownet_fa2 "KT1XsH18aY2GcgSMBAdp2EzHw828iJx2WptU"
+  @shadownet_fa2_entrypoints ~w(balance_of mint set_administrator set_metadata set_pause transfer update_operators)
+  @shadownet_implicit "tz1fFtfd49jRi4SmaeWCWMwJbikPSjGf1HKc"
+  @tz4_address "tz4NWRt3aFyFU2Ydah917Eehxv6uf97j8tpZ"
+  # Valid KT1 checksum over 20 zero bytes, never originated.
+  @missing_contract "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT"
 
   @tag :tezos
   test "get_counter_for_account" do
     assert {:ok, counter} =
-             Rpc.get_counter_for_account(
-               %Rpc{endpoint: @endpoint},
-               "tz1LKpeN8ZSSFNyTWiBNaE4u4sjaq7J1Vz2z"
-             )
+             Rpc.get_counter_for_account(@shadownet_rpc, "tz1LKpeN8ZSSFNyTWiBNaE4u4sjaq7J1Vz2z")
 
     assert is_integer(counter)
   end
 
   test "prepare_operation/4" do
     contents = [
-      %{
-        "amount" => "100",
-        "destination" => @ghostnet_2_address,
-        "kind" => "transaction"
-      }
+      %{"amount" => "100", "destination" => @shadownet_2_address, "kind" => "transaction"}
     ]
 
-    counter = 1123
-    branch = "BLWdshvgEYbtUaABnmqkMuyMezpfsu36DEJPDJN63CW3TFuk7bP"
-
     assert %{
-             "branch" => "BLWdshvgEYbtUaABnmqkMuyMezpfsu36DEJPDJN63CW3TFuk7bP",
+             "branch" => @branch,
              "contents" => [
                %{
                  "amount" => "100",
                  "counter" => "1123",
                  "destination" => "tz1cMcDFLgFe2picQbo4DY1i6mZJiVhPCu5B",
-                 "fee" => "0",
+                 "fee" => "572",
                  "gas_limit" => "3040",
                  "kind" => "transaction",
                  "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
                  "storage_limit" => "257"
                }
              ]
-           } ==
-             Rpc.prepare_operation(
-               contents,
-               @ghostnet_1_address,
-               counter,
-               branch
-             )
+           } == Rpc.prepare_operation(contents, @shadownet_1_address, 1123, @branch)
+  end
+
+  test "prepare_operation/4 picks the reveal gas limit from the wallet address" do
+    contents = [%{"kind" => "reveal", "public_key" => @shadownet_1_pubkey}]
+
+    assert %{
+             "branch" => @branch,
+             "contents" => [
+               %{
+                 "counter" => "1123",
+                 "fee" => "294",
+                 "gas_limit" => "176",
+                 "kind" => "reveal",
+                 "public_key" => @shadownet_1_pubkey,
+                 "source" => @shadownet_1_address,
+                 "storage_limit" => "0"
+               }
+             ]
+           } == Rpc.prepare_operation(contents, @shadownet_1_address, 1123, @branch)
+  end
+
+  test "prepare_operation/4 sets the default fee of a contract call from the hard gas limit" do
+    contents = [
+      %{
+        "amount" => "0",
+        "destination" => @shadownet_fa2,
+        "kind" => "transaction",
+        "parameters" => %{"entrypoint" => "set_pause", "value" => %{"prim" => "True"}}
+      }
+    ]
+
+    assert %{"contents" => [%{"fee" => "104287", "gas_limit" => "1040000"}]} =
+             Rpc.prepare_operation(contents, @shadownet_1_address, 1123, @branch)
+  end
+
+  test "prepare_operation/4 sets the default fee on the first content only" do
+    contents = [
+      %{"kind" => "reveal", "public_key" => @shadownet_1_pubkey},
+      %{"amount" => "0", "destination" => @shadownet_fa2, "kind" => "transaction"}
+    ]
+
+    assert %{
+             "contents" => [
+               # The contract call's fee can make the whole fee 3 bytes long, 16384 is the
+               # smallest 3-byte fee.
+               %{"counter" => "1123", "fee" => "16384", "gas_limit" => "176"},
+               %{"counter" => "1124", "fee" => "0", "gas_limit" => "520000"}
+             ]
+           } = Rpc.prepare_operation(contents, @shadownet_1_address, 1123, @branch)
+  end
+
+  # The first content pays the gas for checking the signature, which grows with the operation's
+  # size, and a reveal or a delegation gets no gas reserve.
+  test "a batch is never bigger once its fees are filled than when simulated" do
+    reveal = %{"kind" => "reveal", "public_key" => @shadownet_1_pubkey}
+    applied = fn milligas -> %{"status" => "applied", "consumed_milligas" => milligas} end
+
+    batches = [
+      {[reveal, %{"kind" => "delegation", "delegate" => @shadownet_1_address}],
+       [applied.("172345"), applied.("200000")]},
+      {[
+         reveal,
+         %{"kind" => "transaction", "amount" => "1", "destination" => @shadownet_2_address}
+       ],
+       [applied.("172345"), Map.put(applied.("2101000"), "allocated_destination_contract", true)]},
+      # The total fee needs one more byte than the reveal's default fee, and the call's limits
+      # keep their size.
+      {[reveal, %{"kind" => "transaction", "amount" => "0", "destination" => @shadownet_fa2}],
+       [applied.("172345"), Map.put(applied.("200000000"), "paid_storage_size_diff", "20000")]}
+    ]
+
+    for {contents, results} <- batches do
+      operation = Rpc.prepare_operation(contents, @shadownet_1_address, 1123, @branch)
+
+      preapplied =
+        Enum.zip_with(operation["contents"], results, fn content, result ->
+          Map.put(content, "metadata", %{"operation_result" => result})
+        end)
+
+      {:ok, filled} = Rpc.fill_operation_fee(operation, preapplied)
+      {:ok, simulated_bytes} = ForgeOperation.operation_group(operation)
+      {:ok, filled_bytes} = ForgeOperation.operation_group(filled)
+
+      assert byte_size(filled_bytes) <= byte_size(simulated_bytes)
+      assert [%{"fee" => fee}, %{"fee" => "0"}] = filled["contents"]
+      assert String.to_integer(fee) > 0
+    end
   end
 
   test "forge_and_sign_operation/2" do
     operation = %{
-      "branch" => "BLWdshvgEYbtUaABnmqkMuyMezpfsu36DEJPDJN63CW3TFuk7bP",
+      "branch" => @branch,
       "contents" => [
         %{
           "amount" => "100",
@@ -75,18 +161,24 @@ defmodule Tezex.RpcTest do
     result =
       "6940b2318870c4b84862aef187c1bbcd4138170459e85092fe34be5d179f40ac6c00980d7cebb50d4b83a4e3307b3ca1b40ebe8f71ab00e308ab0b8102640000b75f0c30536bee108b068d90b151ce846aca11b1009bc207291f08c7117ea3a341328a036ce7bd5da996d9148cc491f96c3097748d7adcdb60599504ae5227aea4a6e69d536baaf96ae2bbb6c261a69d000b323f0a"
 
-    assert {:ok, result} == Rpc.forge_and_sign_operation(operation, @ghostnet_1_pkey)
+    assert {:ok, result} == Rpc.forge_and_sign_operation(operation, @shadownet_1_pkey)
   end
 
   test "forge_and_sign_operation/2 propagates a missing-keys error" do
     assert {:error, {:missing_keys, ["branch"]}} =
-             Rpc.forge_and_sign_operation(%{"contents" => []}, @ghostnet_1_pkey)
+             Rpc.forge_and_sign_operation(%{"contents" => []}, @shadownet_1_pkey)
+  end
+
+  # Nothing listens on port 1, so a request would return a transport error.
+  test "send_operation/5 returns no_transactions without a request for an empty list" do
+    rpc = %Rpc{endpoint: "http://127.0.0.1:1"}
+
+    assert {:error, :no_transactions} =
+             Rpc.send_operation(rpc, [], @shadownet_1_address, @shadownet_1_pkey)
   end
 
   describe "fill_operation_fee/3" do
     test "a contract operation" do
-      operation_result = Tezex.OperationResultFixture.offer()
-
       assert {:ok,
               %{
                 "contents" => [
@@ -94,61 +186,79 @@ defmodule Tezex.RpcTest do
                     "amount" => "1000000",
                     "counter" => "26949360",
                     "destination" => "KT1MFWsAXGUZ4gFkQnjByWjrrVtuQi4Tya8G",
-                    "fee" => "651",
+                    "fee" => "649",
                     "gas_limit" => "2419",
                     "kind" => "transaction",
                     "source" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
                     "storage_limit" => "289"
                   }
                 ]
-              }} =
-               Rpc.fill_operation_fee(
-                 %{
-                   "contents" => []
-                 },
-                 operation_result
-               )
+              }} = Rpc.fill_operation_fee(%{"contents" => []}, OperationResultFixture.offer())
     end
 
     test "a transfer" do
-      operation_result = Tezex.OperationResultFixture.transfer()
-
       assert {:ok,
               %{
                 "contents" => [
                   %{
                     "amount" => "100",
-                    "fee" => "285",
+                    "fee" => "284",
                     "gas_limit" => "269",
                     "storage_limit" => "100"
                   }
                 ]
-              }} =
-               Rpc.fill_operation_fee(
-                 %{
-                   "contents" => []
-                 },
-                 operation_result
-               )
+              }} = Rpc.fill_operation_fee(%{"contents" => []}, OperationResultFixture.transfer())
     end
 
     test "a settle_auction" do
-      operation_result = Tezex.OperationResultFixture.settle_auction()
-
       assert {:ok,
               %{
                 "contents" => [
-                  %{
-                    "fee" => "2372",
-                    "gas_limit" => "20847",
-                    "storage_limit" => "103"
-                  }
+                  %{"fee" => "2370", "gas_limit" => "20847", "storage_limit" => "103"}
                 ]
-              }} = Rpc.fill_operation_fee(%{"contents" => []}, operation_result)
+              }} =
+               Rpc.fill_operation_fee(
+                 %{"contents" => []},
+                 OperationResultFixture.settle_auction()
+               )
+    end
+
+    # The mempool's minimum: 100 mutez, 1 mutez per byte of the operation (branch, contents and
+    # signature) and 0.1 mutez per unit of gas limit.
+    test "the fee covers the mempool's minimum for a 64 and a 96-byte signature" do
+      [content] = OperationResultFixture.transfer()
+
+      for {source, signature_size} <- [{@shadownet_1_address, 64}, {@tz4_address, 96}] do
+        operation = %{"branch" => @branch, "contents" => []}
+
+        {:ok, %{"contents" => [filled]} = filled_operation} =
+          Rpc.fill_operation_fee(operation, [%{content | "source" => source}])
+
+        {:ok, forged} = ForgeOperation.operation_group(filled_operation)
+        size = div(byte_size(forged), 2) + signature_size
+        minimum = 100 + size + ceil(String.to_integer(filled["gas_limit"]) / 10)
+
+        assert String.to_integer(filled["fee"]) >= minimum
+      end
+    end
+
+    test "the caller's limits get no reserve" do
+      assert {:ok, %{"contents" => [%{"gas_limit" => "1040000", "storage_limit" => "60000"}]}} =
+               Rpc.fill_operation_fee(%{"contents" => []}, OperationResultFixture.transfer(),
+                 gas_limit: 1_040_000,
+                 storage_limit: 60_000
+               )
+    end
+
+    test "the fee from the simulation doesn't change the final fee" do
+      [content] = OperationResultFixture.transfer()
+
+      assert {:ok, %{"contents" => [%{"fee" => "284"}]}} =
+               Rpc.fill_operation_fee(%{"contents" => []}, [%{content | "fee" => "104500"}])
     end
 
     test "propagates a missing-keys error" do
-      [content] = Tezex.OperationResultFixture.transfer()
+      [content] = OperationResultFixture.transfer()
       invalid = [Map.delete(content, "amount")]
 
       assert {:error, {:missing_keys, ["amount"]}} =
@@ -166,10 +276,7 @@ defmodule Tezex.RpcTest do
           "storage_limit" => "0",
           "delegate" => "tz1ZW1ZSN4ruXYc3nCon8EaTXp1t3tKWb9Ew",
           "metadata" => %{
-            "operation_result" => %{
-              "consumed_milligas" => "1000000",
-              "status" => "applied"
-            }
+            "operation_result" => %{"consumed_milligas" => "1000000", "status" => "applied"}
           }
         }
       ]
@@ -186,16 +293,10 @@ defmodule Tezex.RpcTest do
       error = %{"id" => "proto.023.michelson_v1.script_rejected", "kind" => "temporary"}
 
       preapplied_operations = [
-        %{
-          "kind" => "transaction",
-          "metadata" => %{
-            "operation_result" => %{"status" => "backtracked"},
-            "internal_operation_results" => [
-              %{"result" => %{"status" => "applied"}},
-              %{"result" => %{"status" => "failed", "errors" => [error]}}
-            ]
-          }
-        }
+        backtracked([
+          %{"result" => %{"status" => "applied"}},
+          %{"result" => %{"status" => "failed", "errors" => [error]}}
+        ])
       ]
 
       assert [^error] = Rpc.preapply_errors(preapplied_operations)
@@ -206,24 +307,8 @@ defmodule Tezex.RpcTest do
       error_b = %{"id" => "proto.023.contract.balance_too_low", "kind" => "temporary"}
 
       preapplied_operations = [
-        %{
-          "kind" => "transaction",
-          "metadata" => %{
-            "operation_result" => %{"status" => "backtracked"},
-            "internal_operation_results" => [
-              %{"result" => %{"status" => "failed", "errors" => [error_a]}}
-            ]
-          }
-        },
-        %{
-          "kind" => "transaction",
-          "metadata" => %{
-            "operation_result" => %{"status" => "backtracked"},
-            "internal_operation_results" => [
-              %{"result" => %{"status" => "failed", "errors" => [error_b]}}
-            ]
-          }
-        }
+        backtracked([%{"result" => %{"status" => "failed", "errors" => [error_a]}}]),
+        backtracked([%{"result" => %{"status" => "failed", "errors" => [error_b]}}])
       ]
 
       assert [^error_a, ^error_b] = Rpc.preapply_errors(preapplied_operations)
@@ -249,28 +334,32 @@ defmodule Tezex.RpcTest do
     setup do
       # Wait approximatively one block between each transaction
       Process.sleep(:timer.seconds(10))
-
-      :ok
     end
 
     test "a contract operation" do
-      rpc = %Rpc{endpoint: @endpoint}
-
-      contents = Tezex.TransactionFixture.offer(@ghostnet_1_address)
+      contents = TransactionFixture.offer(@shadownet_1_address)
 
       assert {:ok, operation_id} =
-               Rpc.send_operation(rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)
+               Rpc.send_operation(
+                 @shadownet_rpc,
+                 contents,
+                 @shadownet_1_address,
+                 @shadownet_1_pkey
+               )
 
       assert is_binary(operation_id)
     end
 
     test "a transfer" do
-      rpc = %Rpc{endpoint: @endpoint}
-
-      contents = Tezex.TransactionFixture.offer(@ghostnet_2_address)
+      contents = TransactionFixture.offer(@shadownet_2_address)
 
       assert {:ok, operation_id} =
-               Rpc.send_operation(rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)
+               Rpc.send_operation(
+                 @shadownet_rpc,
+                 contents,
+                 @shadownet_1_address,
+                 @shadownet_1_pkey
+               )
 
       assert is_binary(operation_id)
     end
@@ -278,14 +367,8 @@ defmodule Tezex.RpcTest do
 
   @tag :tezos
   test "return preapply errors" do
-    rpc = %Rpc{endpoint: @endpoint}
-
     contents = [
-      %{
-        "amount" => "1000000000",
-        "destination" => @ghostnet_2_address,
-        "kind" => "transaction"
-      }
+      %{"amount" => "1000000000", "destination" => @shadownet_2_address, "kind" => "transaction"}
     ]
 
     assert {:error,
@@ -299,16 +382,183 @@ defmodule Tezex.RpcTest do
                    "id" => error_a,
                    "kind" => "temporary"
                  },
-                 %{
-                   "amounts" => [_, "1000000000"],
-                   "id" => error_b,
-                   "kind" => "temporary"
-                 }
+                 %{"amounts" => [_, "1000000000"], "id" => error_b, "kind" => "temporary"}
                ]
              ]}} =
-             Rpc.send_operation(rpc, contents, @ghostnet_1_address, @ghostnet_1_pkey)
+             Rpc.send_operation(@shadownet_rpc, contents, @shadownet_1_address, @shadownet_1_pkey)
 
     assert String.ends_with?(error_a, "balance_too_low"), error_a
     assert String.ends_with?(error_b, "subtraction_underflow"), error_b
+  end
+
+  describe "entrypoints/2 and entrypoint/3" do
+    @describetag :tezos
+
+    test "entrypoints/2 lists the named entrypoints" do
+      assert {:ok, %{"entrypoints" => entrypoints} = body} =
+               Rpc.entrypoints(@shadownet_rpc, @shadownet_fa2)
+
+      assert Enum.sort(Map.keys(entrypoints)) == @shadownet_fa2_entrypoints
+      assert entrypoints["set_pause"] == %{"prim" => "bool"}
+      refute Map.has_key?(body, "unreachable")
+      assert {:ok, ^body} = EntrypointCache.lookup({@shadownet_endpoint, "main", @shadownet_fa2})
+    end
+
+    test "entrypoint/3 returns the type of a named entrypoint" do
+      key = {@shadownet_endpoint, "main", @shadownet_fa2, "set_pause"}
+
+      assert {:ok, %{"prim" => "bool"}} =
+               Rpc.entrypoint(@shadownet_rpc, @shadownet_fa2, "set_pause")
+
+      assert {:ok, %{"prim" => "bool"}} = EntrypointCache.lookup(key)
+    end
+
+    test "entrypoint/3 returns the whole parameter type for default without %default" do
+      assert {:ok, %{"prim" => "or"} = type} =
+               Rpc.entrypoint(@shadownet_rpc, @shadownet_fa2, "default")
+
+      assert Enum.sort(or_leaf_names(type)) == @shadownet_fa2_entrypoints
+    end
+
+    test "entrypoint/3 returns no_such_entrypoint for an unknown name" do
+      key = {@shadownet_endpoint, "main", @shadownet_fa2, "nope"}
+
+      assert {:error, {:no_such_entrypoint, "nope"}} =
+               Rpc.entrypoint(@shadownet_rpc, @shadownet_fa2, "nope")
+
+      assert :error = EntrypointCache.lookup(key)
+    end
+
+    test "entrypoint/3 URI-encodes the name" do
+      assert {:error, {:no_such_entrypoint, "a b/c"}} =
+               Rpc.entrypoint(@shadownet_rpc, @shadownet_fa2, "a b/c")
+    end
+
+    test "entrypoint/3 returns no_such_entrypoint for an implicit account" do
+      assert {:error, {:no_such_entrypoint, "default"}} =
+               Rpc.entrypoint(@shadownet_rpc, @shadownet_implicit, "default")
+    end
+
+    test "entrypoint/3 returns no_such_entrypoint for a contract that doesn't exist" do
+      assert {:error, {:no_such_entrypoint, "transfer"}} =
+               Rpc.entrypoint(@shadownet_rpc, @missing_contract, "transfer")
+    end
+
+    test "entrypoints/2 returns a 404 for an implicit account and a missing contract" do
+      for address <- [@shadownet_implicit, @missing_contract] do
+        assert {:error, {:http_status, %Finch.Response{status: 404}}} =
+                 Rpc.entrypoints(@shadownet_rpc, address)
+      end
+    end
+  end
+
+  describe "entrypoint cache" do
+    # Nothing listens on port 1, so any request that reaches the network fails.
+    # The path makes each test's endpoint, and so its cache keys, unique.
+    setup do
+      %{endpoint: "http://127.0.0.1:1/#{System.unique_integer([:positive])}"}
+    end
+
+    test "entrypoints/2 serves a cached list without a request", %{endpoint: endpoint} do
+      body = %{"entrypoints" => %{"set_pause" => %{"prim" => "bool"}}}
+      :ok = EntrypointCache.put({endpoint, "main", @shadownet_fa2}, body)
+      assert {:ok, ^body} = Rpc.entrypoints(%Rpc{endpoint: endpoint}, @shadownet_fa2)
+    end
+
+    test "entrypoint/3 serves a cached type without a request", %{endpoint: endpoint} do
+      type = %{"prim" => "bool"}
+      :ok = EntrypointCache.put({endpoint, "main", @shadownet_fa2, "set_pause"}, type)
+      assert {:ok, ^type} = Rpc.entrypoint(%Rpc{endpoint: endpoint}, @shadownet_fa2, "set_pause")
+    end
+
+    test "errors are not cached", %{endpoint: endpoint} do
+      rpc = %Rpc{endpoint: endpoint}
+
+      assert {:error, {:transport, _}} = Rpc.entrypoint(rpc, @shadownet_fa2, "transfer")
+      assert {:error, {:transport, _}} = Rpc.entrypoints(rpc, @shadownet_fa2)
+      assert :error = EntrypointCache.lookup({endpoint, "main", @shadownet_fa2, "transfer"})
+      assert :error = EntrypointCache.lookup({endpoint, "main", @shadownet_fa2})
+    end
+
+    test "keys separate endpoints and chains", %{endpoint: endpoint} do
+      :ok =
+        EntrypointCache.put({endpoint, "main", @shadownet_fa2, "set_pause"}, %{"prim" => "bool"})
+
+      for rpc <- [%Rpc{endpoint: endpoint <> "x"}, %Rpc{endpoint: endpoint, chain_id: "other"}] do
+        assert {:error, {:transport, _}} = Rpc.entrypoint(rpc, @shadownet_fa2, "set_pause")
+      end
+    end
+
+    test "an invalid address returns an error without a request", %{endpoint: endpoint} do
+      rpc = %Rpc{endpoint: endpoint}
+      bad_checksum = String.replace_suffix(@shadownet_fa2, "U", "V")
+
+      for address <- [@shadownet_fa2 <> "#1", @shadownet_fa2 <> "/entrypoints/x?", bad_checksum] do
+        assert {:error, {:invalid_address, ^address}} = Rpc.entrypoints(rpc, address)
+        assert {:error, {:invalid_address, ^address}} = Rpc.entrypoint(rpc, address, "transfer")
+        assert :error = EntrypointCache.lookup({endpoint, "main", address})
+        assert :error = EntrypointCache.lookup({endpoint, "main", address, "transfer"})
+      end
+    end
+
+    test "an invalid entrypoint name returns an error without a request", %{endpoint: endpoint} do
+      rpc = %Rpc{endpoint: endpoint}
+
+      for name <- ["", ".", "..", String.duplicate("a", 32)] do
+        assert {:error, {:invalid_entrypoint, ^name}} = Rpc.entrypoint(rpc, @shadownet_fa2, name)
+        assert :error = EntrypointCache.lookup({endpoint, "main", @shadownet_fa2, name})
+      end
+    end
+
+    test "fetch/2 stores successes only", %{endpoint: endpoint} do
+      key = {endpoint, "main", @shadownet_fa2, "x"}
+
+      assert {:error, :boom} = EntrypointCache.fetch(key, fn -> {:error, :boom} end)
+      assert :error = EntrypointCache.lookup(key)
+      assert {:ok, 1} = EntrypointCache.fetch(key, fn -> {:ok, 1} end)
+      assert {:ok, 1} = EntrypointCache.fetch(key, fn -> flunk("cache miss") end)
+    end
+
+    test "put/2 empties the table once it uses 32 MiB", %{endpoint: endpoint} do
+      :ok = EntrypointCache.clear()
+      value = List.duplicate(%{"prim" => "nat"}, 1_000)
+
+      sizes =
+        for i <- 1..2_000 do
+          :ok = EntrypointCache.put({endpoint, "main", "#{i}"}, value)
+          memory = :ets.info(EntrypointCache, :memory) * :erlang.system_info(:wordsize)
+          {:ets.info(EntrypointCache, :size), memory}
+        end
+
+      assert Enum.any?(Enum.drop(sizes, 1), &match?({1, _}, &1))
+      assert sizes |> Enum.map(&elem(&1, 1)) |> Enum.max() < 33 * 1024 * 1024
+    end
+
+    test "clear/0 removes every entry", %{endpoint: endpoint} do
+      key = {endpoint, "main", @shadownet_fa2}
+      :ok = EntrypointCache.put(key, %{})
+      :ok = EntrypointCache.clear()
+      assert :error = EntrypointCache.lookup(key)
+    end
+  end
+
+  defp backtracked(internal_operation_results) do
+    %{
+      "kind" => "transaction",
+      "metadata" => %{
+        "operation_result" => %{"status" => "backtracked"},
+        "internal_operation_results" => internal_operation_results
+      }
+    }
+  end
+
+  # Entrypoint names of the leaves reached through unannotated `or` nodes.
+  defp or_leaf_names(%{"prim" => "or", "args" => [left, right]} = node)
+       when not is_map_key(node, "annots") do
+    or_leaf_names(left) ++ or_leaf_names(right)
+  end
+
+  defp or_leaf_names(%{"annots" => annots}) do
+    for "%" <> name <- annots, do: name
   end
 end

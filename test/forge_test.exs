@@ -23,6 +23,18 @@ defmodule Tezex.ForgeTest do
       assert Forge.unforge_public_key(Forge.forge_public_key(sig)) == sig
     end
 
+    test "public_key tz4" do
+      pubkey = "BLpk1nuQ6M54P2zN2gX2maUUzRa3QVX2eSnXZa184g2sfu2qB2XCGYJdZezkgb7ozbbfYUny1gcP"
+
+      assert "03896a7c2f62e123f7b61fc8954d4b1782a2231b16d323105a05a29641bcaa1823d02f552fbf4ed91a9774e00fee8be4d7" ==
+               Forge.forge_public_key(pubkey, :hex)
+
+      assert Forge.unforge_public_key(Forge.forge_public_key(pubkey)) == pubkey
+
+      assert "896a7c2f62e123f7b61fc8954d4b1782a2231b16d323105a05a29641bcaa1823d02f552fbf4ed91a9774e00fee8be4d7" ==
+               Forge.forge_base58(pubkey, :hex)
+    end
+
     test "forge_base58" do
       v = "BKpLvH3E3bUa5Z2nb3RkH2p6EKLfymvxUAEgtRJnu4m9UX1TWUb"
 

@@ -1,5 +1,29 @@
 # Changelog for Tezex
 
+## Unreleased
+
+- [rpc]: `send_operation/5` returns `{:error, :no_transactions}` when transactions list is empty
+- [rpc]: `prepare_operation/4` and `send_operation/5` no longer raise on a reveal
+- [rpc]: `prepare_operation/4` sets a default fee on the first content; the source's balance must cover it during simulation
+- [rpc]: `fill_operation_fee/3` puts the whole fee on the first content
+- [rpc]: `fill_operation_fee/3` no longer sets a gas limit too low for a reveal or a delegation
+- [rpc]: `fill_operation_fee/3` no longer adds reserves to the caller's `:gas_limit` and `:storage_limit`
+- [rpc]: `fill_operation_fee/3` computes the fee from the new limits, not the simulated ones
+- [fee]: add `default_fee/2` and `extra_size/1`
+- [fee]: count a 96-byte signature for a tz4 source
+- [crypto]: `extract_pubkey/1` and `decode_signature/1` verify the checksum and reject trailing bytes
+- [crypto]: `extract_pubkey/1` rejects secp256k1 and p256 keys that don't start with 02 or 03
+- [crypto]: `check_signature/4` returns `{:error, :invalid_signature}` for a signature with a bad checksum
+- [crypto]: `verify_signature/3` returns `false` instead of raising on input that doesn't decode
+- [crypto]: add `Base58Check.decode_check/1`
+- [forge]: `forge_public_key/2` raises on a key with a bad checksum
+- [forge]: handle tz4 (`BLpk`) public keys
+- [rpc]: add `entrypoints/2` and `entrypoint/3`, cached in ETS
+- [rpc]: `entrypoint/3` returns `{:error, {:no_such_entrypoint, name}}` when the entrypoint doesn't exist
+- [rpc]: `entrypoints/2` and `entrypoint/3` return `{:error, {:invalid_address, address}}` for an invalid address
+- [rpc]: `entrypoint/3` returns `{:error, {:invalid_entrypoint, name}}` for an invalid name
+- [michelson]: add `Tezex.Michelson`: `encode/2` and `encode!/2` build contract call parameters from Elixir terms, `schema/1` shows the term a type expects
+
 ## v5.0.0
 
 - [BREAKING][forge_operation]: error returns changed from `{:error, String.t()}` to `{:error, {:missing_keys, [String.t()]}}` (affects `validate_required_keys/3`, `operation/1`, `operation_group/1` and all per-operation builders)

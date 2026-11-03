@@ -33,6 +33,34 @@ defmodule Tezex.Crypto.Base58Check do
 
   defp double_sha256(x), do: :crypto.hash(:sha256, :crypto.hash(:sha256, x))
 
+  @doc """
+  Decodes a Base58Check string and verifies its checksum. Returns the prefix
+  and the payload, without the checksum.
+
+  ## Examples
+      iex> decode_check("tz3bPFa6mGv8m4Ppn7w5KSDyAbEPwbJNpC9p")
+      {:ok, <<6, 161, 164, 165, 37, 29, 103, 204, 101, 232, 200, 87, 148, 178, 91, 43, 72, 191, 252, 190, 134, 75, 170>>}
+      iex> decode_check("tz3bPFa6mGv8m4Ppn7w5KSDyAbEPwbJNpC9q")
+      :error
+  """
+  @spec decode_check(binary()) :: {:ok, binary()} | :error
+  def decode_check(encoded) do
+    case decode58(encoded) do
+      {:ok, decoded} when byte_size(decoded) > @checksum_length -> verify_checksum(decoded)
+      _ -> :error
+    end
+  end
+
+  defp verify_checksum(decoded) do
+    size = byte_size(decoded) - @checksum_length
+    <<payload::binary-size(^size), checksum::binary-size(@checksum_length)>> = decoded
+
+    case double_sha256(payload) do
+      <<^checksum::binary-size(@checksum_length), _::binary>> -> {:ok, payload}
+      _ -> :error
+    end
+  end
+
   def decode58(encoded) do
     try do
       {:ok, decode58!(encoded)}
