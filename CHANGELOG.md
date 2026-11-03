@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [rpc]: `send_operation/5` returns `{:error, :no_transactions}` when transactions list is empty
 - [rpc]: `prepare_operation/4` and `send_operation/5` no longer raise on a reveal
 - [rpc]: `prepare_operation/4` sets a default fee on the first content; the source's balance must cover it during simulation
 - [rpc]: `fill_operation_fee/3` puts the whole fee on the first content

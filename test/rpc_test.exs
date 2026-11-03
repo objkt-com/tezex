@@ -169,6 +169,14 @@ defmodule Tezex.RpcTest do
              Rpc.forge_and_sign_operation(%{"contents" => []}, @shadownet_1_pkey)
   end
 
+  # Nothing listens on port 1, so a request would return a transport error.
+  test "send_operation/5 returns no_transactions without a request for an empty list" do
+    rpc = %Rpc{endpoint: "http://127.0.0.1:1"}
+
+    assert {:error, :no_transactions} =
+             Rpc.send_operation(rpc, [], @shadownet_1_address, @shadownet_1_pkey)
+  end
+
   describe "fill_operation_fee/3" do
     test "a contract operation" do
       assert {:ok,

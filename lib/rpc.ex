@@ -39,6 +39,7 @@ defmodule Tezex.Rpc do
           | {:no_such_entrypoint, binary()}
           | {:invalid_address, binary()}
           | {:invalid_entrypoint, binary()}
+          | :no_transactions
 
   # KT1, tz1, tz2, tz3, tz4
   @address_prefixes [
@@ -52,12 +53,12 @@ defmodule Tezex.Rpc do
   defstruct [:endpoint, chain_id: "main", headers: [], opts: []]
 
   @spec prepare_operation(
-          list(transaction()),
+          nonempty_list(transaction()),
           nonempty_binary(),
           integer(),
           nonempty_binary()
         ) :: operation()
-  def prepare_operation(transactions, wallet_address, counter, branch) do
+  def prepare_operation([_ | _] = transactions, wallet_address, counter, branch) do
     transactions_length = length(transactions)
     hard_gas_limit_per_content = div(Fee.hard_gas_limit_per_operation(), transactions_length)
 
@@ -259,10 +260,10 @@ defmodule Tezex.Rpc do
         ) ::
           {:ok, any()} | {:error, error_reason()}
   def send_operation(%Rpc{} = rpc, transactions, wallet_address, encoded_private_key, opts \\ []) do
-    transactions = if is_map(transactions), do: [transactions], else: transactions
     offset = Keyword.get(opts, :offset, 0)
 
-    with {:ok, block_head} <- get_block_at_offset(rpc, offset),
+    with {:ok, transactions} <- transaction_list(transactions),
+         {:ok, block_head} <- get_block_at_offset(rpc, offset),
          branch = binary_part(block_head["hash"], 0, 51),
          protocol = block_head["protocol"],
          {:ok, counter} <- get_next_counter_for_account(rpc, wallet_address),
@@ -274,6 +275,10 @@ defmodule Tezex.Rpc do
       inject_operation(rpc, payload)
     end
   end
+
+  defp transaction_list([]), do: {:error, :no_transactions}
+  defp transaction_list(transactions) when is_list(transactions), do: {:ok, transactions}
+  defp transaction_list(transaction) when is_map(transaction), do: {:ok, [transaction]}
 
   @doc """
   Sign the forged operation and returns the forged operation+signature payload to be injected.
