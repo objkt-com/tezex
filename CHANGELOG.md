@@ -17,6 +17,7 @@
 - [crypto]: `verify_signature/3` returns `false` instead of raising on input that doesn't decode
 - [crypto]: add `Base58Check.decode_check/1`
 - [crypto]: add `validate_originated_address/1`
+- [crypto]: `validate_address/1` and `validate_originated_address/1` return `{:error, :invalid_length}` for any string that isn't 36 bytes long
 - [forge]: `forge_public_key/2` raises on a key with a bad checksum
 - [forge]: handle tz4 (`BLpk`) public keys
 - [rpc]: add `entrypoints/2` and `entrypoint/3`, cached in ETS

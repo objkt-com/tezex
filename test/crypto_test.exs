@@ -300,7 +300,12 @@ defmodule Tezex.CryptoTest do
   describe "validate_originated_address/1" do
     test "rejects an address with an entrypoint" do
       assert Crypto.validate_originated_address("KT1VbT8n6YbrzPSjdAscKfJGDDNafB5yHn1H%transfer") ==
-               {:error, :invalid_base58}
+               {:error, :invalid_length}
+    end
+
+    test "rejects a very long string without decoding it" do
+      assert Crypto.validate_originated_address("KT1" <> String.duplicate("z", 1_000_000)) ==
+               {:error, :invalid_length}
     end
   end
 
@@ -308,6 +313,15 @@ defmodule Tezex.CryptoTest do
     test "rejects a KT1 address" do
       assert Crypto.validate_address("KT1VbT8n6YbrzPSjdAscKfJGDDNafB5yHn1H") ==
                {:error, :invalid_prefix}
+    end
+
+    test "rejects a very long string without decoding it" do
+      assert Crypto.validate_address("tz1" <> String.duplicate("z", 1_000_000)) ==
+               {:error, :invalid_length}
+    end
+
+    test "rejects input that isn't a binary" do
+      assert Crypto.validate_address(nil) == {:error, :invalid_base58}
     end
   end
 

@@ -224,6 +224,11 @@ defmodule Tezex.Crypto do
           :ok | {:error, :invalid_base58 | :invalid_checksum | :invalid_length | :invalid_prefix}
   def validate_originated_address(address), do: validate_address(address, [@prefix_kt1])
 
+  # decoding time grows with the square of the input length, so check the length first
+  defp validate_address(address, _prefixes) when byte_size(address) != 36 do
+    {:error, :invalid_length}
+  end
+
   defp validate_address(address, prefixes) do
     with {:ok, decoded} <- Base58Check.decode58(address),
          <<prefix::binary-size(3), pkh::binary-size(20), checksum::binary-size(4)>> <- decoded,
