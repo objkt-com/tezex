@@ -297,6 +297,20 @@ defmodule Tezex.CryptoTest do
     end
   end
 
+  describe "validate_originated_address/1" do
+    test "rejects an address with an entrypoint" do
+      assert Crypto.validate_originated_address("KT1VbT8n6YbrzPSjdAscKfJGDDNafB5yHn1H%transfer") ==
+               {:error, :invalid_base58}
+    end
+  end
+
+  describe "validate_address/1" do
+    test "rejects a KT1 address" do
+      assert Crypto.validate_address("KT1VbT8n6YbrzPSjdAscKfJGDDNafB5yHn1H") ==
+               {:error, :invalid_prefix}
+    end
+  end
+
   describe "sign/3" do
     test "Tz1 64 bytes" do
       encoded_private_key =
