@@ -16,6 +16,7 @@
 - [crypto]: `check_signature/4` returns `{:error, :invalid_signature}` for a signature with a bad checksum
 - [crypto]: `verify_signature/3` returns `false` instead of raising on input that doesn't decode
 - [crypto]: add `Base58Check.decode_check/1`
+- [crypto]: add `validate_originated_address/1`
 - [forge]: `forge_public_key/2` raises on a key with a bad checksum
 - [forge]: handle tz4 (`BLpk`) public keys
 - [rpc]: add `entrypoints/2` and `entrypoint/3`, cached in ETS

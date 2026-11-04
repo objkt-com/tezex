@@ -29,6 +29,8 @@ defmodule Tezex.Crypto do
   @prefix_tz2 <<6, 161, 161>>
   @prefix_tz3 <<6, 161, 164>>
   @prefix_tz4 <<6, 161, 166>>
+  # originated address
+  @prefix_kt1 <<2, 90, 121>>
   # private key
   @prefix_edsk <<43, 246, 78, 7>>
   @prefix_spsk <<17, 162, 224, 201>>
@@ -200,9 +202,32 @@ defmodule Tezex.Crypto do
   @spec validate_address(nonempty_binary()) ::
           :ok | {:error, :invalid_base58 | :invalid_checksum | :invalid_length | :invalid_prefix}
   def validate_address(address) do
+    validate_address(address, [@prefix_tz1, @prefix_tz2, @prefix_tz3, @prefix_tz4])
+  end
+
+  @doc """
+  Validate an originated account address
+
+  ## Examples
+      iex> validate_originated_address("KT1VbT8n6YbrzPSjdAscKfJGDDNafB5yHn1H")
+      :ok
+      iex> validate_originated_address("KT1VbT8n6YbrzPSjdAscKfJGDDNafB5yHn1X")
+      {:error, :invalid_checksum}
+      iex> validate_originated_address("KT1VbT8n6YbrzPSjdAscKfJGDDNafB5yHn10")
+      {:error, :invalid_base58}
+      iex> validate_originated_address("KT1VbT8n6YbrzPSjdAscKfJGDDNafB")
+      {:error, :invalid_length}
+      iex> validate_originated_address("tz3bPFa6mGv8m4Ppn7w5KSDyAbEPwbJNpC9p")
+      {:error, :invalid_prefix}
+  """
+  @spec validate_originated_address(nonempty_binary()) ::
+          :ok | {:error, :invalid_base58 | :invalid_checksum | :invalid_length | :invalid_prefix}
+  def validate_originated_address(address), do: validate_address(address, [@prefix_kt1])
+
+  defp validate_address(address, prefixes) do
     with {:ok, decoded} <- Base58Check.decode58(address),
          <<prefix::binary-size(3), pkh::binary-size(20), checksum::binary-size(4)>> <- decoded,
-         true <- prefix in [@prefix_tz1, @prefix_tz2, @prefix_tz3, @prefix_tz4],
+         true <- prefix in prefixes,
          :ok <- check_checksum(checksum, <<prefix::binary-size(3), pkh::binary-size(20)>>) do
       :ok
     else
